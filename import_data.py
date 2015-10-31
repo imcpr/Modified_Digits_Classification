@@ -6,8 +6,6 @@
 import numpy as np
 import csv
 
-
-
 def import_csv(file_path):
     """ Here we are taking in a csv file and returning it as a numpy array, but we build it with python lists. """
     print 'Loading file: %s'%file_path
