@@ -6,14 +6,12 @@
 
 from import_data import import_csv
 from neural_net import NeuralNetwork
-from sklearn.feature_selection import SelectKBest,chi2
 import time
-import numpy as np
 
 data_files_path = '/Users/kian/documents/COMP598/Assignment3/data_and_scripts/'
 
-TRAIN_INPUTS_PATH = data_files_path+'train_inputs_subset.csv'
-TRAIN_OUTPUTS_PATH = data_files_path+'train_outputs_subset.csv'
+TRAIN_INPUTS_PATH = data_files_path+'train_inputs.csv'
+TRAIN_OUTPUTS_PATH = data_files_path+'train_outputs.csv'
 TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
 
 def accuracy(predictions, actual):
@@ -35,22 +33,26 @@ if __name__ == '__main__':
     starttime = time.clock()
     train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
     train_inputs = import_csv(TRAIN_INPUTS_PATH)
+    test_inputs = import_csv(TEST_INPUTS_PATH)
     print 'Time to import: %0.1f'%(time.clock() - starttime)
 
     num_features = len(train_inputs[0])
     num_classes = 10
 
     starttime = time.clock()
-    nn = NeuralNetwork(num_features, [100], num_classes, dummy=True)
-    train_x = train_inputs[0:500]
-    train_y = train_outputs[0:500]
+    nn = NeuralNetwork(num_features, [1000], num_classes, dummy=True)
+    # train_x = train_inputs[0:2500]
+    # train_y = train_outputs[0:2500]
     print 'Training network...'
-    nn.fit(train_x, train_y, training_horizon=1, verbose=True)
+    nn.fit(train_inputs, train_outputs, training_horizon=1, verbose=True)
     print 'Time to train: %0.1f'%(time.clock() - starttime)
 
-    test_x = train_inputs[4000:4500]
-    test_y = train_outputs[4000:4500]
-    p = nn.predict(test_x)
-    accuracy(p, test_y)
+    p = nn.predict(test_inputs)
+    with open(data_files_path+'predictions_1layer_1000nodes.csv','w') as f:
+        f.write('Id,Prediction\n')
+        for i in range(len(p)):
+            f.write('%d,%d\n'%(i+1,p[i]))
+
+    # accuracy(p, test_y)
 
 

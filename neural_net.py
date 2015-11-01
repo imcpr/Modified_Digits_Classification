@@ -74,8 +74,8 @@ class NeuralNetwork(object):
             for _ in range(training_horizon):
                 for i in range(len(X)):
                     if verbose:
-                        if i % 1 == 0:
-                            print '  Training with %dth sample...'%i
+                        if i % 100 == 0:
+                            print '%d... '%i,
                     self.feedforward(X[i])
                     self.backpropagate(y[i])
 
@@ -104,15 +104,13 @@ class NeuralNetwork(object):
     def backpropagate(self, target_value):
         """ Trains the network. """
         for i in range(len(self.network[-1])):
-            output_node = self.network[-1][i]
-
             if type(target_value) == int:
                 target = 1.0 if i==target_value else 0.0 # We want to return a 1 for the correct classification and 0 for the other nodes.
             else:
                 target = target_value
 
-            output_node.error(target)
-            output_node.update_weights()
+            self.network[-1][i].error(target)
+            self.network[-1][i].update_weights()
 
         for k in reversed(range(1,len(self.network)-1)):
             for node in self.network[k]:
