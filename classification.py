@@ -1,5 +1,8 @@
 # coding=utf-8
-# @author Kian Kenyon-Dean
+# Authors:
+#   Kian Kenyon-Dean.
+#
+# Coding began October 31st, 2015
 
 from import_data import import_csv
 
