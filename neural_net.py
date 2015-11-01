@@ -5,38 +5,44 @@
 # Coding began October 31st, 2015
 
 import numpy as np
-from nn_math import sigmoid
+from nn_math import sigmoid as sig
 from operator import attrgetter
 
+sigmoid = sig
+deriv_sigmoid = None
+
 """ The main neural network classifier object and its methods are here. """
-class NeuralNetwork:
+class NeuralNetwork(object):
     """ Our neural network. """
 
-    def __init__(self, hidden_layers_nodes, num_inputs, num_outputs, error=lambda y,hat: 0.5*(y-hat)**2):
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, error=lambda y,hat: 0.5*(y-hat)**2, sigmoid_constant=1):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
+        global sigmoid,deriv_sigmoid
 
         self.network = [[] for _ in range(len(hidden_layers_nodes)+2)] # We have h hidden layers plus 1 input layer and 1 output layer.
-        self.make_input_layer(num_inputs)
-        self.make_hidden_layers(hidden_layers_nodes)
-        self.make_output_layer(num_outputs)
+        self.__make_input_layer(num_inputs)
+        self.__make_hidden_layers(hidden_layers_nodes)
+        self.__make_output_layer(num_outputs)
         self.error = error
+        sigmoid = sig(0, c=sigmoid_constant)
+        deriv_sigmoid = lambda x: sigmoid(x)*(1 - sigmoid(x))
 
-    # ------------ Initialization functions. ---------------- #
-    def make_input_layer(self, num_inputs):
+    # ------------ Private initialization functions. ---------------- #
+    def __make_input_layer(self, num_inputs):
         """ We add +1 so as to have an x0 initial value. """
         for _ in range(num_inputs+1):
             self.network[0].append(InputNode())
 
-    def make_output_layer(self, num_outputs):
+    def __make_output_layer(self, num_outputs):
         for i in range(num_outputs):
             self.network[-1].append(OutputNode(i+1)) # Here I am setting the class values to be 1+ the actual value (so that we don't have 0 as a class).
 
         # Here we are connecting each node in the previous layer to each node in the output layer.
         for node in self.network[-2]:
             for output_node in self.network[-1]:
-                self.connect(node, output_node)
+                self.__connect(node, output_node)
 
-    def make_hidden_layers(self, hidden_layers_nodes):
+    def __make_hidden_layers(self, hidden_layers_nodes):
         # Iterate through hidden_layers_nodes list - each element is the number of nodes we make for the hidden layer.
         for i in range(len(hidden_layers_nodes)):
             num_nodes_to_make = hidden_layers_nodes[i]
@@ -48,10 +54,10 @@ class NeuralNetwork:
 
                 # Connect each node in the previous layer to the current node we are making.
                 for node in self.network[h-1]:
-                    self.connect(node,n)
+                    self.__connect(node,n)
 
     @staticmethod
-    def connect(from_node, to_node):
+    def __connect(from_node, to_node):
         s = Synapse(from_node, to_node)
         from_node.add_out_synapse(s)
         to_node.add_in_synapse(s)
@@ -81,14 +87,22 @@ class NeuralNetwork:
         for k in range(len(self.network)): # For each layer, k...
             for n in self.network[k]:
                 n.set_value(n.output())
+
+        #TODO: prediction analysis
         """
-         TODO: I do not know what the prediction of a network will be. Here I assume that the prediction will simply be
+         I do not know what the prediction of a network will be. Here I assume that the prediction will simply be
          the output node that has the highest value after feeding forward, but this may not be the case!!!
         """
         return max(self.network[-1], key=attrgetter('value'))
 
-
-
+    # ------------ Debugging functions ------------- #
+    def count(self):
+        synapses = 0
+        for k in range(len(self.network)):
+            for node in self.network[k]:
+                synapses += len(node.in_synapses)
+            print 'Number of nodes in layer %d: %d'%(k, len(self.network[k]))
+        print 'Total number of synapses: {:,}'.format(synapses)
 
 #----------------- Node super class -----------------#
 class Node(object):
@@ -117,6 +131,7 @@ class Node(object):
         return np.array([s.in_node.get_value() for s in self.in_synapses])
 
     def output(self):
+        global sigmoid
         return sigmoid(np.dot(self.get_synapse_weights(),self.get_node_input_values()))
 
 #----------------- Input node class -----------------#
