@@ -18,10 +18,10 @@ TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
 if __name__ == '__main__':
     # train_outputs = import_csv(TRAIN_OUTPUTS_PATH)
 
-    num_features = 48*48
-    nn = NeuralNetwork(num_features,[100],10)
-    nn.initialize_input_sample(np.array([float(i)/num_features for i in range(num_features)]))
+    # Below provides a good test to show that it works succesfully based on the example given
+    # on this paper (pg. 20): https://www4.rgu.ac.uk/files/chapter3%20-%20bp.pdf
+    # nn = NeuralNetwork(2, [2], 1, dummy=False)
+    # nn.initialize_weights([[0.1, 0.4, 0.8, 0.6],[0.3, 0.9]])
+    # nn.fit(np.array([[0.35, 0.9]]), np.array([0.5]), training_horizon=1)
 
-    print nn.feed_forward().value
-    nn.count()
-    # time.sleep(15)
+
