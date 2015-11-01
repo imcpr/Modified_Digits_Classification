@@ -21,7 +21,10 @@ def import_csv(file_path):
             row_values = []
             for value in sample[1:]: # Skip the first index - the ID column.
                 row_values.append(float(value))
-            dataset.append(row_values)
+            if len(row_values) == 1:
+                dataset.append(row_values[0])
+            else:
+                dataset.append(np.array(row_values))
 
     return np.array(dataset)
 

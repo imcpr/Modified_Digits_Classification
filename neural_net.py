@@ -9,7 +9,6 @@ from nn_math import sigmoid as sig
 from operator import attrgetter
 
 sigmoid = sig
-deriv_sigmoid = None
 
 """ The main neural network classifier object and its methods are here. """
 class NeuralNetwork(object):
@@ -17,7 +16,7 @@ class NeuralNetwork(object):
 
     def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, error=lambda y,hat: 0.5*(y-hat)**2, sigmoid_constant=1, dummy=True):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
-        global sigmoid,deriv_sigmoid
+        global sigmoid
         self.dummy = 1 if dummy else 0
         self.network = [[] for _ in range(len(hidden_layers_nodes)+2)] # We have h hidden layers plus 1 input layer and 1 output layer.
         self.__make_input_layer(num_inputs)
@@ -25,7 +24,6 @@ class NeuralNetwork(object):
         self.__make_output_layer(num_outputs)
         self.error = error
         sigmoid = sig(0, c=sigmoid_constant)
-        # deriv_sigmoid = lambda x: sigmoid(x)*(1 - sigmoid(x))
 
     # ------------ Initialization functions. ---------------- #
     def __make_input_layer(self, num_inputs):
@@ -69,38 +67,42 @@ class NeuralNetwork(object):
                     j += 1
 
     # ------------ Training functions for taking in samples. ------------- #
-    def fit(self, X, y, training_horizon=5, grad_descent='stochastic'):
+    def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False):
         """ training_horizon designates how many times we iterate through the training set. """
         assert len(X) == len(y)
-
         if grad_descent == 'stochastic':
             for _ in range(training_horizon):
                 for i in range(len(X)):
-                    self.input(X[i])
-                    self.feedforward()
+                    if verbose:
+                        if i % 1 == 0:
+                            print '  Training with %dth sample...'%i
+                    self.feedforward(X[i])
                     self.backpropagate(y[i])
 
     def input(self, input_array):
         """ Initialize the values of all of the input nodes to equal each value in the input_array. I assume the input_array has shape (m,)"""
         assert len(input_array) + self.dummy == len(self.network[0])
-
         if self.dummy:
             self.network[0][0].set_value(1.0) # Set the dummy variable.
-
         for i in range(len(input_array)):
             self.network[0][i + self.dummy].set_value(input_array[i])
 
-    def feedforward(self):
+    def feedforward(self, sample):
         """ Returns the network's prediction. """
+        self.input(sample)
         for k in range(len(self.network)): # For each layer, k...
             for n in self.network[k]:
                 n.output() # This is all we need because output() sets the nodes value as well.
 
         #The prediction will be the node with the highest value (closest to 1.0).
-        prediction_node = max(self.network[-1], key=attrgetter('value'))
-        return prediction_node.classification
+        if len(self.network[-1]) > 1:
+            prediction_node = max(self.network[-1], key=attrgetter('value'))
+            return prediction_node.classification
+        else:
+            return self.network[-1][0].value
 
     def backpropagate(self, target_value):
+        """ Trains the network. """
         for i in range(len(self.network[-1])):
             output_node = self.network[-1][i]
 
@@ -109,13 +111,16 @@ class NeuralNetwork(object):
             else:
                 target = target_value
 
-            print output_node.value,target, output_node.error(target)
+            output_node.error(target)
             output_node.update_weights()
 
         for k in reversed(range(1,len(self.network)-1)):
             for node in self.network[k]:
                 node.hidden_error()
                 node.update_weights()
+
+    def predict(self, X):
+        return np.array([self.feedforward(sample) for sample in X])
 
     # ------------ Debugging functions ------------- #
     def count(self):
@@ -162,7 +167,7 @@ class Neuron(object):
         return np.array([s.weight for s in self.in_synapses])
 
     def get_node_input_values(self):
-        return np.array([s.in_node.get_value() for s in self.in_synapses])
+        return np.array([s.in_node.value for s in self.in_synapses])
 
     def output(self):
         global sigmoid
