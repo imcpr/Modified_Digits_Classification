@@ -6,6 +6,7 @@
 
 from import_data import import_csv
 from neural_net import NeuralNetwork
+from sklearn.decomposition import PCA
 import time
 
 data_files_path = '/Users/kian/documents/COMP598/Assignment3/data_and_scripts/'
@@ -13,6 +14,13 @@ data_files_path = '/Users/kian/documents/COMP598/Assignment3/data_and_scripts/'
 TRAIN_INPUTS_PATH = data_files_path+'train_inputs.csv'
 TRAIN_OUTPUTS_PATH = data_files_path+'train_outputs.csv'
 TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
+
+TRAIN_INPUT_SUBSET_PATH = data_files_path+'train_inputs_subset.csv'
+TRAIN_OUTPUT_SUBSET_PATH = data_files_path+'train_outputs_subset.csv'
+
+def feature_reduce(dataset, desired):
+    print 'Reducing feature set size from %d to %d...'%(len(dataset[0]),desired)
+    return PCA(n_components=desired).fit_transform(dataset)
 
 def accuracy(predictions, actual):
     assert len(predictions) == len(actual)
@@ -29,30 +37,49 @@ if __name__ == '__main__':
     # nn.initialize_weights([[0.1, 0.4, 0.8, 0.6],[0.3, 0.9]])
     # nn.fit(np.array([[0.35, 0.9]]), np.array([0.5]), training_horizon=1)
 
-
     starttime = time.clock()
-    train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
-    train_inputs = import_csv(TRAIN_INPUTS_PATH)
-    test_inputs = import_csv(TEST_INPUTS_PATH)
+    train_outputs = import_csv(TRAIN_OUTPUT_SUBSET_PATH).astype(int)
+    train_inputs = import_csv(TRAIN_INPUT_SUBSET_PATH)
     print 'Time to import: %0.1f'%(time.clock() - starttime)
 
-    num_features = len(train_inputs[0])
-    num_classes = 10
+    train_inputs = feature_reduce(train_inputs, 500)
 
     starttime = time.clock()
-    nn = NeuralNetwork(num_features, [1000], num_classes, dummy=True)
-    # train_x = train_inputs[0:2500]
-    # train_y = train_outputs[0:2500]
+    print 'Building network...'
+    num_classes = 10
+    nn = NeuralNetwork(len(train_inputs[0]), [], num_classes, dummy=True)
+    nn.randomly_initalize_weights((-1.0,1.0))
+
+    train_x = train_inputs[0:1000]
+    train_y = train_outputs[0:1000]
+    test_x = train_inputs[4501:4601]
+    test_y = train_outputs[4501:4601]
+
     print 'Training network...'
-    nn.fit(train_inputs, train_outputs, training_horizon=1, verbose=True)
+    nn.fit(train_x, train_y, training_horizon=15, verbose=True, print_mod=500)
     print 'Time to train: %0.1f'%(time.clock() - starttime)
 
-    p = nn.predict(test_inputs)
-    with open(data_files_path+'predictions_1layer_1000nodes.csv','w') as f:
-        f.write('Id,Prediction\n')
-        for i in range(len(p)):
-            f.write('%d,%d\n'%(i+1,p[i]))
+    starttime = time.clock()
+    print '\nTest set results:'
+    p_test = nn.predict(test_x, verbose=True, print_mod=500)
+    print p_test
+    accuracy(p_test, test_y)
+    print 'Time to predict: %0.1f'%(time.clock() - starttime)
 
-    # accuracy(p, test_y)
+    starttime = time.clock()
+    print '\nTrain set results:'
+    p_train = nn.predict(train_x, verbose=True, print_mod=500)
+    print p_train
+    accuracy(p_train, train_y)
+    print 'Time to predict: %0.1f'%(time.clock() - starttime)
 
+
+
+
+    # test_inputs = import_csv(TEST_INPUTS_PATH)
+    # p = nn.predict(test_inputs)
+    # with open(data_files_path+'predictions_1layer_250nodes.csv','w') as f:
+    #     f.write('Id,Prediction\n')
+    #     for i in range(len(p)):
+    #         f.write('%d,%d\n'%(i+1,p[i]))
 

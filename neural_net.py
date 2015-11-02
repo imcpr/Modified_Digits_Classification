@@ -5,6 +5,7 @@
 # Coding began October 31st, 2015
 
 import numpy as np
+import random
 from nn_math import sigmoid as sig
 from operator import attrgetter
 
@@ -66,16 +67,24 @@ class NeuralNetwork(object):
                     synapse.weight = weights_layers[k][j]
                     j += 1
 
+    def randomly_initalize_weights(self, r_range, seed=1917):
+        random.seed(seed)
+        for k in range(len(self.network)):
+            for node in self.network[k]:
+                for synapse in node.out_synapses:
+                    synapse.weight = random.uniform(r_range[0], r_range[1])
+
     # ------------ Training functions for taking in samples. ------------- #
-    def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False):
+    def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False, print_mod=1):
         """ training_horizon designates how many times we iterate through the training set. """
         assert len(X) == len(y)
         if grad_descent == 'stochastic':
             for _ in range(training_horizon):
                 for i in range(len(X)):
                     if verbose:
-                        if i % 100 == 0:
-                            print '%d... '%i,
+                        if i % print_mod == 0:
+                            print '%d... '%i
+
                     self.feedforward(X[i])
                     self.backpropagate(y[i])
 
@@ -117,8 +126,14 @@ class NeuralNetwork(object):
                 node.hidden_error()
                 node.update_weights()
 
-    def predict(self, X):
-        return np.array([self.feedforward(sample) for sample in X])
+    def predict(self, X, verbose=False, print_mod=1):
+        p = []
+        for i in range(len(X)):
+            if verbose:
+                if i % print_mod == 0:
+                    print '%d...'%i
+            p.append(self.feedforward(X[i]))
+        return np.array(p)
 
     # ------------ Debugging functions ------------- #
     def count(self):
