@@ -55,6 +55,24 @@ class NeuralNetwork(object):
                 for node in self.network[h-1]:
                     self.__connect(node,n) # Connect each node in the previous layer to the current node we are making.
 
+    def __make_everything(self, num_inputs, hidden_layers_nodes, num_outputs, weight_range=(-1.0,1.0), seed=1917):
+        value_matrix = [np.zeros(num_inputs)]
+        for k in range(len(hidden_layers_nodes)):
+            value_matrix.append(np.zeros(hidden_layers_nodes[k]))
+        value_matrix.append(np.zeros(num_outputs))
+        value_matrix = np.array(value_matrix)
+
+        # weight_matrix[layer][node] = np.array(all weights coming out of that node)
+        weight_matrix = []
+        np.random.seed(seed)
+        for k in range(len(value_matrix)-1): # We don't need out weights for the last layer
+            weight_matrix.append([])
+            for node_num in range(len(value_matrix[k])):
+                weight_matrix[k].append(np.random.uniform(low=weight_range[0]),high=weight_range[1],size=len(value_matrix[k])*len(value_matrix[k+1]))
+        weight_matrix = np.array(weight_matrix)
+
+        return value_matrix,weight_matrix
+
     @staticmethod
     def __connect(from_node, to_node):
         s = Synapse(from_node, to_node)
@@ -75,7 +93,7 @@ class NeuralNetwork(object):
         for k in range(len(self.network)):
             for node in self.network[k]:
                 for synapse in node.out_synapses:
-                    synapse.weight = random.uniform(r_range[0], r_range[1])
+                    synapse.weight = random.uniform(*r_range)
 
     # ------------ Training functions for taking in samples. ------------- #
     def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False):
@@ -117,10 +135,13 @@ class NeuralNetwork(object):
         """ Trains the network. """
         for i in range(len(self.network[-1])):
             if type(target_value) == int:
-                target = 1.0 if i==target_value else 0.0 # We want to return a 1 for the correct classification and 0 for the other nodes.
+                if i == target_value:
+                    target = 1.0
+                else:
+                    target = 0.0 # We want to return a 1 for the correct classification and 0 for the other nodes.
             else:
                 target = target_value
-
+            print target
             self.network[-1][i].error(target)
             self.network[-1][i].update_weights()
 
