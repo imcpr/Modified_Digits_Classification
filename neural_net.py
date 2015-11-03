@@ -6,6 +6,7 @@
 
 import numpy as np
 import random
+import pyprind
 from nn_math import sigmoid as sig
 from operator import attrgetter
 
@@ -15,11 +16,13 @@ sigmoid = sig
 class NeuralNetwork(object):
     """ Our neural network. """
 
-    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, error=lambda y,hat: 0.5*(y-hat)**2, sigmoid_constant=1, dummy=True):
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, error=lambda y,hat: 0.5*(y-hat)**2, sigmoid_constant=1, dummy=True, learning_rate=1.0):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         global sigmoid
         self.dummy = 1 if dummy else 0
         self.network = [[] for _ in range(len(hidden_layers_nodes)+2)] # We have h hidden layers plus 1 input layer and 1 output layer.
+        self.learning_rate = learning_rate
+
         self.__make_input_layer(num_inputs)
         self.__make_hidden_layers(hidden_layers_nodes)
         self.__make_output_layer(num_outputs)
@@ -30,11 +33,11 @@ class NeuralNetwork(object):
     def __make_input_layer(self, num_inputs):
         """ We add +1 so as to have an x0 initial value. """
         for _ in range(num_inputs + self.dummy):
-            self.network[0].append(Neuron())
+            self.network[0].append(Neuron(learning_rate=self.learning_rate))
 
     def __make_output_layer(self, num_outputs):
         for i in range(num_outputs):
-            self.network[-1].append(Neuron(classification=i)) #i is the classification associated with the neuron.
+            self.network[-1].append(Neuron(classification=i,learning_rate=self.learning_rate)) #i is the classification associated with the neuron.
 
         # Here we are connecting each node in the previous layer to each node in the output layer.
         for node in self.network[-2]:
@@ -47,7 +50,7 @@ class NeuralNetwork(object):
             num_nodes_to_make = hidden_layers_nodes[i]
             h = i+1 # We are making the h^th layer of the network.
             for _ in range(num_nodes_to_make):
-                n = Neuron()
+                n = Neuron(learning_rate=self.learning_rate)
                 self.network[h].append(n)
                 for node in self.network[h-1]:
                     self.__connect(node,n) # Connect each node in the previous layer to the current node we are making.
@@ -75,16 +78,16 @@ class NeuralNetwork(object):
                     synapse.weight = random.uniform(r_range[0], r_range[1])
 
     # ------------ Training functions for taking in samples. ------------- #
-    def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False, print_mod=1):
+    def fit(self, X, y, training_horizon=5, grad_descent='stochastic', verbose=False):
         """ training_horizon designates how many times we iterate through the training set. """
         assert len(X) == len(y)
+        if verbose:
+            bar = pyprind.ProgBar(training_horizon*len(X))
         if grad_descent == 'stochastic':
             for _ in range(training_horizon):
                 for i in range(len(X)):
                     if verbose:
-                        if i % print_mod == 0:
-                            print '%d... '%i
-
+                        bar.update()
                     self.feedforward(X[i])
                     self.backpropagate(y[i])
 
@@ -126,13 +129,14 @@ class NeuralNetwork(object):
                 node.hidden_error()
                 node.update_weights()
 
-    def predict(self, X, verbose=False, print_mod=1):
+    def predict(self, X, verbose=False):
         p = []
+        if verbose:
+            bar = pyprind.ProgBar(len(X))
         for i in range(len(X)):
-            if verbose:
-                if i % print_mod == 0:
-                    print '%d...'%i
             p.append(self.feedforward(X[i]))
+            if verbose:
+                bar.update()
         return np.array(p)
 
     # ------------ Debugging functions ------------- #
@@ -143,6 +147,11 @@ class NeuralNetwork(object):
                 synapses += len(node.in_synapses)
             print 'Number of nodes in layer %d: %d'%(k, len(self.network[k]))
         print 'Total number of synapses: {:,}'.format(synapses)
+
+    def log(self):
+        print 'LR: %d'%self.learning_rate
+        for k in range(len(self.network)):
+            print '  Layer %d length: %d'%(k,len(self.network[k]))
 
     def __repr__(self):
         s = ''
