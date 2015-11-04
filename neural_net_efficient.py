@@ -84,34 +84,17 @@ class NeuralNetwork(object):
     def backpropagate(self, target_value):
         """ Trains the network. """
         targets = np.array([1.0 if i==target_value else 0.0 for i in range(len(self.nodes[-1]))])
-        # print 'targets',targets
         self.errors[-1] = self.nodes[-1][:] * (1.0 - self.nodes[-1][:]) * (targets - self.nodes[-1][:])
-        # print 'errors',self.errors[-1]
-
         self.update_weights(len(self.weights)-1)
-        # for i in range(len(self.nodes[-2])):
-        #     self.weights[-1][i,:] += self.lr * self.errors[-1][:] * self.nodes[-2][i]
-        # print self.weights
-            # for j in range((self.no)):
-            #     print self.weights[-1][i,j],self.lr, self.errors[-1][j], self.nodes[-2][i]
-            #     self.weights[-1][i,j] += self.lr * self.errors[-1][j] * self.nodes[-2][i]
-            #     print self.weights[-1][i,j]
-            # self.weights[-1][i,:] += self.lr * self.errors[-1][:] * self.nodes[-1][i]
 
         for k in reversed(range(1,len(self.nodes)-1)):
-            # print k
             self.errors[k] = self.nodes[k][:] * (1.0 - self.nodes[k][:]) * np.dot(self.errors[k+1][:], self.weights[k][:][:].T)
             self.update_weights(k-1)
-            # for i in range(len(self.nodes[k])):
-            #     self.weights[k][i,:] += self.lr * self.errors[k][:] * self.nodes[k][i]
         return
 
     def update_weights(self, layer):
-        # print self.errors[layer+1]
-
         for i in range(len(self.nodes[layer])):
             self.weights[layer][i,:] += self.lr * self.errors[layer+1][:] * self.nodes[layer][i]
-        # print self.weights
 
     def predict(self, X, verbose=False):
         p = []

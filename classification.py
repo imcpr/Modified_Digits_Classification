@@ -39,63 +39,71 @@ if __name__ == '__main__':
     # nn = NeuralNetwork(2, [3], 2, dummy=False, weight_range=(-3,3))
     # nn.fit(np.array([[0.35, 0.9]]), np.array([1]), training_horizon=1)
 
-    x = []
-    b = [1.0,0.0]
-    for i in b:
-        for j in b:
-            for k in b:
-                x.append([i,j,k])
-    y = []
-    for l in x:
-        y.append(1.0 if (l[0] or l[1]) and l[2] else 0.0)
-    # for i in x: print i
-    # print y
-
-    nn = NeuralNetwork(3,[1],2,weight_range=(0,1),learning_rate=1.0,dummy=True)
-    # print nn.weights
-    # # nn.feedforward(x[0])
-    # # nn.backpropagate(target_value=1.0)
-    # print nn.weights
-    nn.fit(x,y, training_horizon=70)
-    p = nn.predict(x)
-    print '-------------------------------'
-    print p,y
-    accuracy(p,y)
-
-    exit(0)
+    # x = []
+    # b = [1.0,0.0]
+    # for i in b:
+    #     for j in b:
+    #         for k in b:
+    #             x.append([i,j,k])
+    # y = []
+    # for l in x:
+    #     y.append(1.0 if (l[0] or l[1]) and l[2] else 0.0)
+    # # for i in x: print i
+    # # print y
+    #
+    # nn = NeuralNetwork(3,[1],2,weight_range=(0,1),learning_rate=1.0,dummy=True)
+    # # print nn.weights
+    # # # nn.feedforward(x[0])
+    # # # nn.backpropagate(target_value=1.0)
+    # # print nn.weights
+    # nn.fit(x,y, training_horizon=70)
+    # p = nn.predict(x)
+    # print '-------------------------------'
+    # print p,y
+    # accuracy(p,y)
+    #
+    # exit(0)
 
     starttime = time.clock()
-    train_outputs = import_csv(TRAIN_OUTPUT_SUBSET_PATH).astype(int)
-    train_inputs = transform_features(import_csv(TRAIN_INPUT_SUBSET_PATH))
-    train_inputs = import_csv(TRAIN_INPUT_SUBSET_PATH)
+    train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
+    train_inputs = (import_csv(TRAIN_INPUTS_PATH))
+    test_inputs = (import_csv(TEST_INPUTS_PATH))
+
+    # train_inputs = import_csv(TRAIN_INPUT_SUBSET_PATH)
     print 'Time to import: %0.1f'%(time.clock() - starttime)
 
-    train_inputs = feature_reduce(train_inputs, 500)
-
-    train_x = train_inputs[0:4500]
-    train_y = train_outputs[0:4500]
-    test_x = train_inputs[4501:]
-    test_y = train_outputs[4501:]
-
+    alll = feature_reduce(list(train_inputs)+list(test_inputs), 500)
+    train = alll[:len(train_inputs)]
+    test = alll[len(train_inputs):]
+    # train_x = train_inputs[0:4500]
+    # train_y = train_outputs[0:4500]
+    # test_x = train_inputs[4501:]
+    # test_y = train_outputs[4501:]
     
     starttime = time.clock()
     print 'Building network...'
     num_classes = 10
-    nn = NeuralNetwork(len(train_inputs[0]), [50], num_classes, dummy=True, learning_rate=1.0, weight_range=(-0.5,0.5))
+    nn = NeuralNetwork(len(train[0]), [25], num_classes, dummy=True, learning_rate=1.0, weight_range=(0,1))
 
     print 'Training network...'
-    nn.fit(train_x, train_y, training_horizon=1, verbose=True)
+    nn.fit(train, train_outputs, training_horizon=100, verbose=True)
     print 'Time to train: %0.1f'%(time.clock() - starttime)
 
-    print '\nTest set results:'
-    p_test = nn.predict(test_x, verbose=True)
-    print p_test
-    accuracy(p_test, test_y)
+    p = nn.predict(test)
+    with open(data_files_path+'predictions_500f_umodified_1layer_25nodes_th100.csv','w') as f:
+        f.write('Id,Prediction\n')
+        for i in range(len(p)):
+            f.write('%d,%d\n'%(i+1,p[i]))
 
-    print '\nTrain set results:'
-    p_train = nn.predict(train_x, verbose=True)
-    print p_train
-    accuracy(p_train, train_y)
+    # print '\nTest set results:'
+    # p_test = nn.predict(test_x, verbose=True)
+    # print p_test
+    # accuracy(p_test, test_y)
+    #
+    # print '\nTrain set results:'
+    # p_train = nn.predict(train_x, verbose=True)
+    # print p_train
+    # accuracy(p_train, train_y)
     # nn.log()
 
     """
@@ -119,10 +127,4 @@ if __name__ == '__main__':
     print 'Train results...'
     accuracy(s1.predict(train_x),train_y)
     """
-    # test_inputs = import_csv(TEST_INPUTS_PATH)
-    # p = nn.predict(test_inputs)
-    # with open(data_files_path+'predictions_1layer_250nodes.csv','w') as f:
-    #     f.write('Id,Prediction\n')
-    #     for i in range(len(p)):
-    #         f.write('%d,%d\n'%(i+1,p[i]))
 
