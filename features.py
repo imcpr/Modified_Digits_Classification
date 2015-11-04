@@ -1,3 +1,10 @@
+# coding=utf-8
+# Authors:
+#   Casper Liu
+#   Yann Long
+#
+# Coding began Novembre 2nd, 2015
+
 import csv
 import math
 import numpy as np
@@ -9,7 +16,7 @@ from scipy import misc
 from skimage import transform
 from skimage.morphology import disk
 from skimage import exposure
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 from matplotlib.image import imsave
 from sklearn import svm, metrics
 from skimage.morphology import reconstruction
@@ -21,7 +28,7 @@ def M(image, p, q):
     for x in range(0, w):
         for y in range(0, h):
             acc += (x**p)*(y**q)*image[x,y]
-    return acc
+    acc
 
 # using image moments, tries to align the image by its principal axis
 def deskew(image):
@@ -36,9 +43,9 @@ def deskew(image):
     lambda_m = max(lambda1, lambda2)
     # Convert from radians to degrees
     angle =  ceil(atan((lambda_m - mu20)/mu11)*18000/pi)/100
-    # print angle
+    #print angle
     center = tuple(map(int, (x, y)))
-    # print center
+    #print center
     tf_rotate = transform.SimilarityTransform(rotation=np.deg2rad(angle))
     tf_shift = transform.SimilarityTransform(translation=[-center[0], -center[1]])
     tf_shift_inv = transform.SimilarityTransform(translation=[center[0], center[1]])
@@ -127,6 +134,7 @@ def transform_features(data):
         dm = dm-get_dilated(dm)*0.5
         out_data.append(dm.flatten())
         bar.update()
+        
     return out_data
 
 # d = get_circle_filter(48,48)
@@ -151,3 +159,74 @@ def transform_features(data):
 #         dm = deskew(m)
 #         imsave("original/%d.png" % (i+1), m)
 #         imsave("deskew/%d.png" % (i+1), dm)
+
+def makeHeader(i):
+    header = 'Id'
+    for _ in range(i):
+        dim = ',dim_%i'%_
+        header += dim
+    return header
+    
+def main():
+    from import_data import import_csv
+    from sklearn.decomposition import PCA
+    import time
+    data_files_path = 'data_and_scripts/'
+    
+    TRAIN_INPUTS_PATH = data_files_path+'train_inputs.csv'
+    TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
+
+    TRAIN_INPUTS_SUBSET_PATH = data_files_path+'train_inputs_subset.csv'
+    
+    #get the original inputs
+    starttime = time.clock()
+    train_inputs = import_csv(TRAIN_INPUTS_PATH)
+    test_inputs = import_csv(TEST_INPUTS_PATH)
+    print 'Time to import: %0.1f'%(time.clock() - starttime)    
+    
+    N,K = np.shape(train_inputs)
+    T,Ki = np.shape(test_inputs)
+    print N , K
+    print T , Ki
+    #concatenate train and test image
+    concat = np.concatenate((train_inputs, test_inputs), axis=0)    
+    print 'concatenated'
+    print np.shape(concat)
+    
+    #apply transformation
+    starttime = time.clock()
+    transformed_concat = transform_features(concat, 500)
+    print 'Time to transform: %0.1f'%(time.clock() - starttime)
+    
+    #apply PCA
+    starttime = time.clock()
+    desired=500
+    print 'Reducing feature set size from %d to %d...'%(K,desired)
+    features = PCA(n_components=desired).fit_transform(transformed_concat)
+    print 'Time to transform: %0.1f'%(time.clock() - starttime)
+    
+    #split
+    transform_train_inputs, transform_test_inputs = features[:N,], features[N:,]
+    
+    #save to csv file    
+    starttime = time.clock()
+    print 'saving to csv file'
+    header = makeHeader(desired)
+    #Id column
+    transform_train_inputs = np.concatenate((np.arange(N).reshape(N,1),transform_train_inputs), axis=1)
+    transform_test_inputs = np.concatenate((np.arange(T).reshape(T,1),transform_test_inputs),axis=1)
+    np.savetxt(data_files_path+'transformed_train_inputs.csv',transform_train_inputs,fmt='%f', delimiter=',', newline='\n', header=header,comments='')
+    np.savetxt(data_files_path+ 'transformed_test_inputs.csv',transform_test_inputs,fmt='%f', delimiter=',', newline='\n', header=header,comments='')
+    print 'Time to save: %0.1f'%(time.clock() - starttime)
+    
+
+   
+if __name__ == '__main__': main()
+    
+    
+    
+    
+    
+    
+    
+    
