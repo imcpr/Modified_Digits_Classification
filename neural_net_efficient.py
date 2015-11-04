@@ -93,8 +93,9 @@ class NeuralNetwork(object):
         return
 
     def update_weights(self, layer):
-        for i in range(len(self.nodes[layer])):
-            self.weights[layer][i,:] += self.lr * self.errors[layer+1][:] * self.nodes[layer][i]
+        # for i in range(len(self.nodes[layer])):
+        #     self.weights[layer][i,:] += self.lr * self.errors[layer+1][:] * self.nodes[layer][i]
+        self.weights[layer] += self.lr * (self.errors[layer+1][:,np.newaxis] * self.nodes[layer][:][np.newaxis]).T
 
     def predict(self, X, verbose=False):
         p = []
