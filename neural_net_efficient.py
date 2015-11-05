@@ -16,13 +16,16 @@ from math import sqrt
 class NeuralNetwork(object):
     """ Our neural network. """
 
-    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, dropout=0.0, seed=1717):
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, dropout=None, maxnorm=None,schedule=None,update=None, seed=1717):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         np.random.seed(seed)
 
         self.dummy = 1 if dummy else 0
         self.lr = learning_rate
         self.p = dropout
+        self.c = maxnorm
+        self.sched = schedule
+        self.up = update
 
         # quantities of nodes
         self.ni = num_inputs + dummy
@@ -30,8 +33,6 @@ class NeuralNetwork(object):
         self.nhn = list(np.array(hidden_layers_nodes) + dummy) # num hidden nodes per layer
         self.no = num_outputs
         
-        
-
         # initialize node matrix
         nodes = [np.ones(self.ni)]
         for i in range(self.nhl):
@@ -75,12 +76,19 @@ class NeuralNetwork(object):
         if verbose:
             bar = pyprind.ProgBar(training_horizon*len(X))
         if grad_descent == 'stochastic':
-            for _ in range(training_horizon):
+            for j in range(training_horizon):
                 for i in range(len(X)):
                     if verbose:
                         bar.update()    
                     self.feedforward(X[i])
                     self.backpropagate(y[i])
+                            
+                if self.c:
+                    self.maxnorm()
+                    
+                if self.sched:
+                    if j % self.sched == 0:
+                        self.lr *= self.up
 
     def input(self, input_array):
         """ Initialize the values of all of the input nodes to equal each value in the input_array. I assume the input_array has shape (m,)"""
@@ -104,13 +112,12 @@ class NeuralNetwork(object):
     def backpropagate(self, target_value):
         """ Trains the network. """
         targets = np.array([1.0 if i==target_value else 0.0 for i in range(len(self.nodes[-1]))])
-        self.errors[-1] = self.nodes[-1][:] * (1.0 - self.nodes[-1][:]) * (targets - self.nodes[-1][:])
+        self.errors[-1] = self.nodes[-1] * (1.0 - self.nodes[-1]) * (targets - self.nodes[-1])
         self.update_weights(len(self.weights)-1)
 
         for k in reversed(range(1,len(self.nodes)-1)):
-            self.errors[k] = self.nodes[k][:] * (1.0 - self.nodes[k][:]) * np.dot(self.errors[k+1][:], self.weights[k][:][:].T)
+            self.errors[k] = self.nodes[k] * (1.0 - self.nodes[k]) * np.dot(self.errors[k+1], self.weights[k].T)
             self.update_weights(k-1)
-        return
 
     def update_weights(self, layer):
         # for i in range(len(self.nodes[layer])):
@@ -133,5 +140,12 @@ class NeuralNetwork(object):
     def random_dropout(self):
         for k in range(self.nhl):
             self.dom[k]=np.r_[1, np.random.binomial(1, self.p, size=(self.nhn[k]-1))]
+    
+    def maxnorm(self):
+        for k in range(len(self.nodes)-1):
+            for row in self.weights[k]:
+                norm = np.linalg.norm(row)
+                if norm > self.c:
+                    row *= self.c/norm
 
 
