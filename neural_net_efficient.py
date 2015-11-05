@@ -46,7 +46,7 @@ class NeuralNetwork(object):
         # initialize weight matrix such that weights[k][(b,c)] is the weight from node b on layer k to node c on layer k+1
         weights = []
         for k in range(len(self.nodes)-1):
-            weights.append(np.random.randn(len(self.nodes[k]),len(self.nodes[k+1]))*sqrt(1.0/len(self.nodes[k])))
+            weights.append(np.random.randn(len(self.nodes[k]),len(self.nodes[k+1]))*sqrt(2.0/len(self.nodes[k])))
         self.weights = np.array(weights)
         
         # initialize Dropout matrix
