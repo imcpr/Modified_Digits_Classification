@@ -126,7 +126,7 @@ def apply_filter(image, f):
 def transform_features(data):
     d = get_circle_filter(48,48)
     out_data = []
-    bar = pyprind.ProgBar(len(data))
+    bar = pyprind.ProgBar(len(data), title="Transforming raw features")
     for row in data:
         # from (2304,) to (48,48) because i wrote the functions for 2d , can optimize later
         m = a2m(row)
@@ -134,19 +134,19 @@ def transform_features(data):
         dm = dm-get_dilated(dm)*0.5
         out_data.append(dm.flatten())
         bar.update()
-        
     return out_data
 
-# d = get_circle_filter(48,48)
-# X, Y = get_train(100)
-# dX = []
-# for i in range(0, len(X)):
-#     m = a2m(X[i])
-#     dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
-#     dm = dm-get_dilated(dm)*0.5
-#     # imsave("data_and_scripts/original/%d.png" % (i+1), m, cmap="Greys_r")
-#     imsave("data_and_scripts/deskew/%d.png" % (i+1), dm, cmap="Greys_r")
+# # d = get_circle_filter(48,48)
+# X, Y = get_train(10000)
+# # dX = []
+# # for i in range(0, len(X)):
+# #     m = a2m(X[i])
+# #     dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
+# #     dm = dm-get_dilated(dm)*0.5
+# #     # imsave("data_and_scripts/original/%d.png" % (i+1), m, cmap="Greys_r")
+# #     imsave("data_and_scripts/deskew/%d.png" % (i+1), dm, cmap="Greys_r")
 
+# dX = transform_features(X)
 # cl = svm.SVC(gamma=0.001)
 # cl = cl.fit(dX[:8000], Y[:8000])
 # pred = cl.predict(dX[8000:])
@@ -222,11 +222,3 @@ def main():
 
    
 if __name__ == '__main__': main()
-    
-    
-    
-    
-    
-    
-    
-    
