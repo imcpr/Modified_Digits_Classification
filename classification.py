@@ -11,6 +11,7 @@ from neural_net_efficient import NeuralNetwork
 from sklearn.cross_validation import train_test_split
 from sklearn.metrics import classification_report
 from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
 import time
 import os
 
@@ -65,15 +66,15 @@ if __name__ == '__main__':
     print np.shape(train_inputs)   
 
     #randomly split the data into a train set and a validation set
-    train_x, test_x, train_y, test_y = train_test_split(train_inputs[1000:], train_outputs[1000:], test_size=0.2, random_state=17)
+    train_x, test_x, train_y, test_y = train_test_split(train_inputs, train_outputs, test_size=0.2, random_state=17)
 
     starttime = time.clock()
     print 'Building network...'
     num_classes = 10
-    nn = NeuralNetwork(len(train_inputs[0]), [50], num_classes, dummy=True, learning_rate=0.025)
+    nn = NeuralNetwork(len(train_inputs[0]), [50], num_classes, dummy=True, learning_rate=0.05, dropout=0.5)
 
     print 'Training network...'
-    nn.fit(train_x, train_y, training_horizon=10, verbose=True)
+    nn.fit(train_x, train_y, training_horizon=200, verbose=True)
     print 'Time to train: %0.1f'%(time.clock() - starttime)
 
     starttime = time.clock()
@@ -81,18 +82,17 @@ if __name__ == '__main__':
     p_test = nn.predict(test_x, verbose=True)
     print classification_report(test_y, p_test)
     print confusion_matrix(test_y, p_test)
-    heatmap(test_y, p_test, 'testheatmap')
+    heatmap(p_test, test_y, 'testheatmap')
     accuracy(p_test, test_y)
-    
     print 'Time to predict: %0.1f'%(time.clock() - starttime)
 
     starttime = time.clock()
     print '\nTrain set results:'
     p_train = nn.predict(train_x, verbose=True) 
+    print classification_report(train_y, p_train)
+    print confusion_matrix(train_y, p_train)
+    heatmap(p_train, train_y, 'trainheatmap')
     accuracy(p_train, train_y)
-    print classification_report(test_y, p_test)
-    print confusion_matrix(test_y, p_test)
-    heatmap(train_y, p_train, 'trainheatmap')
     print 'Time to predict: %0.1f'%(time.clock() - starttime)
 
 
