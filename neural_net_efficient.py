@@ -1,6 +1,7 @@
 # coding=utf-8
 # Authors:
 #   Kian Kenyon-Dean wrote the architecture of the network and all of the objects.
+#   Yann Long changed the weights initialization
 #
 # Coding began October 31st, 2015
 
@@ -8,13 +9,14 @@ import numpy as np
 import pyprind
 import copy
 from scipy.special import expit
+from math import sqrt
 
 
 """ The main neural network classifier object and its methods are here. """
 class NeuralNetwork(object):
     """ Our neural network. """
 
-    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, weight_range=(-1.0,1.0), seed=1917):
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, seed=1717):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         np.random.seed(seed)
 
@@ -40,13 +42,13 @@ class NeuralNetwork(object):
         # initialize weight matrix such that weights[k][(b,c)] is the weight from node b on layer k to node c on layer k+1
         weights = []
         for k in range(len(self.nodes)-1):
-            weights.append(np.random.uniform(low=weight_range[0],high=weight_range[1], size=(len(self.nodes[k]),len(self.nodes[k+1]))))
+            weights.append(np.random.randn(len(self.nodes[k]),len(self.nodes[k+1]))*sqrt(1.0/len(self.nodes[k])))
         self.weights = np.array(weights)
 
         # initialize momentum matrix
         momentums = []
         for k in range(len(self.nodes)-1):
-            momentums.append(np.random.uniform(low=weight_range[0],high=weight_range[1], size=(len(self.nodes[k]),len(self.nodes[k+1]))))
+            momentums.append(np.random.uniform(0,1, size=(len(self.nodes[k]),len(self.nodes[k+1]))))
         self.momentums = np.array(momentums)
 
         del nodes,weights,momentums
