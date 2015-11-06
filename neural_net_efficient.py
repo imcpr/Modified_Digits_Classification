@@ -16,9 +16,7 @@ from math import sqrt
 class NeuralNetwork(object):
     """ Our neural network. """
 
-    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, dropout=None, maxnorm=None, Schedule=None, Update=None, seed=1917):
-
-
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, dropout=None, maxnorm=None,schedule=None,update=None, seed=1717):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         np.random.seed(seed)
 
@@ -118,7 +116,7 @@ class NeuralNetwork(object):
         self.update_weights(len(self.weights)-1)
 
         for k in reversed(range(1,len(self.nodes)-1)):
-            self.errors[k] = self.nodes[k] * (1.0 - self.nodes[k]) * np.dot(self.errors[k+1], self.weights[k].T)
+            self.errors[k] = self.nodes[k] * (1.0 - self.nodes[k]) * np.dot(self.weights[k], self.errors[k+1])
             self.update_weights(k-1)
 
     def update_weights(self, layer):
@@ -130,13 +128,23 @@ class NeuralNetwork(object):
         pred = []
         if verbose:
             bar = pyprind.ProgBar(len(X))
-        for i in range(len(X)):
-            self.input(X[i])
-            for k in range(len(self.nodes)-1):
-                self.nodes[k+1] = expit(self.nodes[k].dot(self.weights[k]))
-            pred.append(np.argmax(self.nodes[-1]))
+        if self.p:
+            for i in range(len(X)):
+                self.input(X[i])
+                for k in range (len(self.nodes)-2):
+                    self.nodes[k+1]=(expit(self.nodes[k].dot(self.weights[k])))/self.p
+                pred.append(np.argmax(expit(self.nodes[-2].dot(self.weights[-1]))))
             if verbose:
                 bar.update()
+        else:
+            for i in range(len(X)):
+                self.input(X[i])
+                for k in range(len(self.nodes)-1):
+                    self.nodes[k+1] = expit(self.nodes[k].dot(self.weights[k]))
+                pred.append(np.argmax(self.nodes[-1]))
+            if verbose:
+                bar.update()
+        
         return np.array(pred)
         
     def random_dropout(self):
