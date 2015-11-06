@@ -16,8 +16,8 @@ from math import sqrt
 class NeuralNetwork(object):
     """ Our neural network. """
 
+    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, dropout=None, maxnorm=None, Schedule=None, Update=None, seed=1917):
 
-    def __init__(self, num_inputs, hidden_layers_nodes, num_outputs, dummy=True, learning_rate=1.0, weight_range=(-1.0,1.0), seed=1917, regularization=1.0):
 
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         np.random.seed(seed)

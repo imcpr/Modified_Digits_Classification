@@ -75,6 +75,7 @@ def optimize_hyper_params(X, Y, features=500):
 
         best_weights = max()
 
+
 if __name__ == '__main__':
     # Below provides a good test to show that it works succesfully based on the example given
     # on this paper (pg. 20): https://www4.rgu.ac.uk/files/chapter3%20-%20bp.pdf
@@ -106,6 +107,15 @@ if __name__ == '__main__':
     accuracy(p,y)
 
     exit(0)
+
+
+    starttime = time.clock()
+    train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
+    train_inputs = (import_csv(TRAIN_INPUTS_PATH))
+    test_inputs = (import_csv(TEST_INPUTS_PATH))
+
+    # train_inputs = import_csv(TRAIN_INPUT_SUBSET_PATH)
+    print 'Time to import: %0.1f'%(time.clock() - starttime)
 
     alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), 500)
     train = alll[:len(train_inputs)]
@@ -165,4 +175,3 @@ if __name__ == '__main__':
     print 'Train results...'
     accuracy(s1.predict(train_x),train_y)
     """
-
