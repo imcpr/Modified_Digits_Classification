@@ -70,9 +70,6 @@ def optimize_hyper_params(X, Y, features=500):
 
         best_weights = max()
 
-
-
-
 if __name__ == '__main__':
     # Below provides a good test to show that it works succesfully based on the example given
     # on this paper (pg. 20): https://www4.rgu.ac.uk/files/chapter3%20-%20bp.pdf
