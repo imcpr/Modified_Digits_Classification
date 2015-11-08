@@ -132,7 +132,7 @@ class NeuralNetwork(object):
             for i in range(len(X)):
                 self.input(X[i])
                 for k in range (len(self.nodes)-2):
-                    self.nodes[k+1]=(expit(self.nodes[k].dot(self.weights[k])))/self.p
+                    self.nodes[k+1]=(expit(self.nodes[k].dot(self.weights[k])))*self.p
                 pred.append(np.argmax(expit(self.nodes[-2].dot(self.weights[-1]))))
             if verbose:
                 bar.update()
