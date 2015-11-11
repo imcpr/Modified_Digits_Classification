@@ -217,7 +217,7 @@ def command_line_run(args):
     else:
         print accuracy(p, test_outputs)
         if '-record' in args_dict:
-            heatmap(p, test_y, fname)
+            heatmap(p, test_outputs, fname)
 
 
 if __name__ == '__main__':
