@@ -35,7 +35,9 @@ from theano.tensor.nnet import conv
 
 from logistic_sgd import LogisticRegression, load_data
 from mlp import HiddenLayer
-from features import get_train, get_test
+from features import get_train, get_test, get_circle_filter, apply_linear_filter
+from sklearn.decomposition import PCA
+import cPickle
 
 
 class LeNetConvPoolLayer(object):
@@ -107,7 +109,7 @@ class LeNetConvPoolLayer(object):
         # reshape it to a tensor of shape (1, n_filters, 1, 1). Each bias will
         # thus be broadcasted across mini-batches and feature map
         # width & height
-        self.output = T.tanh(pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))
+        self.output = T.nnet.relu(pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))
 
         # store parameters of this layer
         self.params = [self.W, self.b]
@@ -166,20 +168,14 @@ class ConvNet:
         self.valid_set_x, self.valid_set_y = self.shared_dataset((data_x[octet*6:octet*7], data_y[octet*6:octet*7]))
         self.test_set_x, self.test_set_y = self.shared_dataset((data_x[octet*7:], data_y[octet*7: ]))
 
-    def __init__(self, data_x, data_y, learning_rate=0.1, n_epochs=100,
-                    dataset='mnist.pkl.gz',
-                    nkerns=[20, 50], batch_size=500):
-        self.rng = numpy.random.RandomState(23455)
+    def __init__(self, data_x, data_y, learning_rate=0.4, n_epochs=100,
+                    nkerns=[30, 60, 120], batch_size=500):
+        self.rng = numpy.random.RandomState(73951)
         self.nkerns = nkerns
-         # pX = PCA(n_components=28*28).fit_transform(X)
 
         self.set_data(data_x, data_y)
+        self.learning_rate = learning_rate
 
-
-        # kX = theano.shared(numpy.asarray(kaggle_input,
-        #                                 dtype=theano.config.floatX), borrow=True)
-        # n_kaggle_batches = kX.get_value(borrow=True).shape[0]
-        # n_kaggle_batches /= batch_size
 
         self.batch_size = batch_size
         # compute number of minibatches for training, validation and testing
@@ -193,8 +189,6 @@ class ConvNet:
 
 
         # allocate symbolic variables for the data
-        index = T.lscalar()  # index to a [mini]batch
-        kX = T.matrix('kX')
         # start-snippet-1
         self.x = T.matrix('x')   # the data is presented as rasterized images
         self.y = T.ivector('y')  # the labels are presented as 1D vector of
@@ -205,19 +199,20 @@ class ConvNet:
         ######################
         print '... building the model'
 
+        # w, h = 48, 48
+        # w1, h1 = (w-7+1)/2, (h-7+1)/2
+        # w2, h2 = (w1-4+1)/2, (h1-4+1)/2
+        # w3, h3 = (w2-4+1)/2, (h2-4+1)/2
+
+
         w, h = 48, 48
         w1, h1 = (w-5+1)/2, (h-5+1)/2
-        w2, h2 = (w1-7+1)/2, (h1-7+1)/2
+        w2, h2 = (w1-3+1)/2, (h1-3+1)/2
+        w3, h3 = (w2-3+1)/2, (h2-3+1)/2
 
-        # Reshape matrix of rasterized images of shape (batch_size, 28 * 28)
-        # to a 4D tensor, compatible with our LeNetConvPoolLayer
-        # (28, 28) is the size of MNIST images.
+
         self.layer0_input = self.x.reshape((self.batch_size, 1, w, h))
 
-        # Construct the first convolutional pooling layer:
-        # filtering reduces the image size to (28-5+1 , 28-5+1) = (24, 24)
-        # maxpooling reduces this further to (24/2, 24/2) = (12, 12)
-        # 4D output tensor is thus of shape (batch_size, nkerns[0], 12, 12)
         self.layer0 = LeNetConvPoolLayer(
             self.rng,
             input=self.layer0_input,
@@ -226,43 +221,50 @@ class ConvNet:
             poolsize=(2, 2)
         )
 
-        # Construct the second convolutional pooling layer
-        # filtering reduces the image size to (12-5+1, 12-5+1) = (8, 8)
-        # maxpooling reduces this further to (8/2, 8/2) = (4, 4)
-        # 4D output tensor is thus of shape (batch_size, nkerns[1], 4, 4)
         self.layer1 = LeNetConvPoolLayer(
             self.rng,
             input=self.layer0.output,
             image_shape=(self.batch_size, self.nkerns[0], w1, h1),
-            filter_shape=(self.nkerns[1], self.nkerns[0], 7, 7),
+            filter_shape=(self.nkerns[1], self.nkerns[0], 3, 3),
             poolsize=(2, 2)
         )
 
-        # the HiddenLayer being fully-connected, it operates on 2D matrices of
-        # shape (batch_size, num_pixels) (i.e matrix of rasterized images).
-        # This will generate a matrix of shape (batch_size, nkerns[1] * 4 * 4),
-        # or (500, 50 * 4 * 4) = (500, 800) with the default values.
-        self.layer2_input = self.layer1.output.flatten(2)
+        # third convolutional pooling layer
+        self.layer2 = LeNetConvPoolLayer(
+            self.rng,
+            input=self.layer1.output,
+            image_shape=(self.batch_size, self.nkerns[1], w2, w2),
+            filter_shape=(self.nkerns[2], self.nkerns[1], 3, 3),
+            poolsize=(2,2)
+        )
+
+        self.layer3_input = self.layer2.output.flatten(2)
 
         # construct a fully-connected sigmoidal layer
-        self.layer2 = HiddenLayer(
+        self.layer3 = HiddenLayer(
             self.rng,
-            input=self.layer2_input,
-            n_in=self.nkerns[1] * w2 * h2,
+            input=self.layer3_input,
+            n_in=self.nkerns[2] * w3 * h3,
             n_out=500,
-            activation=T.tanh
+            activation=T.nnet.relu
         )
 
         # classify the values of the fully-connected sigmoidal layer
-        self.layer3 = LogisticRegression(input=self.layer2.output, n_in=500, n_out=10)
+        self.layer4 = LogisticRegression(input=self.layer3.output, n_in=500, n_out=10)
 
         # the cost we minimize during training is the NLL of the model
-        self.cost = self.layer3.negative_log_likelihood(self.y)
+        self.cost = self.layer4.negative_log_likelihood(self.y)
+
+    def compile(self):
+        # separate compiling function so we can recompile if we reload a different set of saved params
+
+        index = T.lscalar()  # index to a [mini]batch
+        kX = T.matrix('kX')
 
         # create a function to compute the mistakes that are made by the model
         self.test_model = theano.function(
             [index],
-            self.layer3.errors(self.y),
+            self.layer4.errors(self.y),
             givens={
                 self.x: self.test_set_x[index * self.batch_size: (index + 1) * self.batch_size],
                 self.y: self.test_set_y[index * self.batch_size: (index + 1) * self.batch_size]
@@ -271,7 +273,7 @@ class ConvNet:
 
         self.validate_model = theano.function(
             [index],
-            self.layer3.errors(self.y),
+            self.layer4.errors(self.y),
             givens={
                 self.x: self.valid_set_x[index * self.batch_size: (index + 1) * self.batch_size],
                 self.y: self.valid_set_y[index * self.batch_size: (index + 1) * self.batch_size]
@@ -280,14 +282,14 @@ class ConvNet:
 
         self.compute_kaggle = theano.function(
             [kX, index],
-            self.layer3.y_pred,
+            self.layer4.y_pred,
             givens={
-                self.x: kX[index * batch_size: (index + 1) * batch_size],
+                self.x: kX[index * self.batch_size: (index + 1) * self.batch_size],
             }
         )
 
         # create a list of all model parameters to be fit by gradient descent
-        self.params = self.layer3.params + self.layer2.params + self.layer1.params + self.layer0.params
+        self.params = self.layer4.params + self.layer3.params + self.layer2.params + self.layer1.params + self.layer0.params
 
         # create a list of gradients for all model parameters
         self.grads = T.grad(self.cost, self.params)
@@ -298,7 +300,7 @@ class ConvNet:
         # create the updates list by automatically looping over all
         # (params[i], grads[i]) pairs.
         updates = [
-            (param_i, param_i - learning_rate * grad_i)
+            (param_i, param_i - self.learning_rate * grad_i)
             for param_i, grad_i in zip(self.params, self.grads)
         ]
 
@@ -314,6 +316,7 @@ class ConvNet:
         # end-snippet-1
 
     def predict(self, kaggle_input):
+        # output prediction given feature matrix
         n_batches = len(kaggle_input)/self.batch_size
         preds = np.zeros((1,1))
         for idx in range(n_batches):
@@ -404,12 +407,15 @@ class ConvNet:
 
 
 if __name__ == '__main__':
-    X, Y = get_train(30000)
-    cnn = ConvNet(X,Y)
+    X, Y = get_train(10000,transform=False)
+    tX, tY = get_train(20000, start=10001, transform=True)
+    DX = X[:7500]+tX[:7500]+X[7500:8750]+tX[7500:8750]+X[8750:]+tX[8750:]
+    DY = Y[:7500]+tY[:7500]+Y[7500:8750]+tY[7500:8750]+Y[8750:]+tY[8750:]
+    cnn = ConvNet(DX,DY)
+    cnn.compile()
     cnn.train(10)
     # kaggle_input = get_test(20000)
-    # cnn.predict(kaggle_input)
-
+    # preds = cnn.predict(kaggle_input)
 
 def experiment(state, channel):
     evaluate_lenet5(state.learning_rate, dataset=state.dataset)
@@ -428,3 +434,17 @@ def save_preds(preds, filename):
         writer.writerow(["Id", "Prediction"])
         for i in range(len(preds)):
             writer.writerow([i+1] + [int(preds[i].sum())])
+
+def load_model(cnn, filename):
+    import cPickle
+    p = cPickle.load(open(filename, 'rb'))
+    cnn.layer4.W.set_value(p[0].eval())
+    cnn.layer4.b.set_value(p[1].eval())
+    cnn.layer3.W.set_value(p[2].eval())
+    cnn.layer3.b.set_value(p[3].eval())
+    cnn.layer2.W.set_value(p[4].eval())
+    cnn.layer2.b.set_value(p[5].eval())
+    cnn.layer1.W.set_value(p[6].eval())
+    cnn.layer1.b.set_value(p[7].eval())
+    cnn.layer0.W.set_value(p[8].eval())
+    cnn.layer0.b.set_value(p[9].eval())
