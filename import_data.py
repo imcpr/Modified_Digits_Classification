@@ -64,10 +64,13 @@ def get_best_k(datax, datay, k=5):
         datay = datay[0:idx] + datay[idx+1:]
     return best
 
-def analysis(hidden_nodes = True): # for dropouts and hidden nodes.
+def hidden_or_dropout_analysis(hidden_nodes = True): # for dropouts and hidden nodes.
+    pl.ylabel('Accuracy', fontsize=16)
     if hidden_nodes:
+        pl.xlabel('Number of Hidden Nodes', fontsize=16)
         name = 'number_of_hidden_nodes_optimization_incrementing_epochs.csv'
     else:
+        pl.xlabel('Dropout Rate', fontsize=16)
         name = 'dropout_optimization.csv'
 
     data = import_results_csv(name)
@@ -95,11 +98,16 @@ def analysis(hidden_nodes = True): # for dropouts and hidden nodes.
 
     pl.legend(bbox_to_anchor=(1,0.6))
 
-    pl.show()
+    if hidden_nodes:
+        pl.savefig('hidden_nodes.png', bbox_inches='tight')
+    else:
+        pl.savefig('dropout_rate.png', bbox_inches='tight')
 
-    exit(0)
+
 
 def learning_rate_analysis(log=True):
+    pl.ylabel('Accuracy', fontsize=16)
+    pl.xlabel('Value of Learning Rate', fontsize=16)
     if log:
         data = import_results_csv('learning_rate_optimization_logarithmic.csv')
     else:
@@ -128,24 +136,18 @@ def learning_rate_analysis(log=True):
 
     if log:
         pl.legend(bbox_to_anchor=(1,0.6))
+        pl.savefig('learning_rate_logarithmic.png', bbox_inches='tight')
     else:
         pl.legend(bbox_to_anchor=(1,0.2))
+        pl.savefig('learning_rate.png', bbox_inches='tight')
 
-    pl.show()
+def features_analysis(epochs=False):
+    if epochs:
+        name = 'number_of_features_optimization_incrementing_epochs(v1).csv'
+    else:
+        name = 'number_of_features_optimization.csv'
 
-    exit(0)
-
-if __name__ == '__main__':
-    # analysis(hidden_nodes=False)
-    learning_rate_analysis(log=False)
-
-    # get = import_results_csv('number_of_features_optimization.csv')
-    # first_test = get[1][1]
-    # first_train = get[1][2]
-    # del get
-
-    name = 'number_of_features_optimization_incrementing_epochs(v1).csv'
-    epochs = 1 if 'epochs' in name else 0
+    epochs = 1 if epochs else 0
 
     features_graph = import_results_csv(name)
     var_names = features_graph[0]
@@ -158,41 +160,23 @@ if __name__ == '__main__':
     pl.plot(x, test_acc, 'ro-', label='Test accuracy')
     pl.plot(x, train_acc, 'bo-', label='Train accuracy')
 
+    pl.xlabel('Number of Features', fontsize=16)
+    pl.ylabel('Accuracy', fontsize=16)
+
     best_line_test = get_best_k(x, test_acc, k=1)[0][0]
     best_line_train = get_best_k(x, train_acc, k=1)[0][0]
-    # pl.plot(x, [best_line_test]*len(x), 'r')
-    # pl.plot(x, [best_line_train]*len(x), 'b')
-
-    # print train_acc
-    # print test_acc
-    # ymax = get_best_k(x, train_acc, k=1)[0][0]
 
     pl.axis([50,2350,0.05,0.6]) # change first val to -50 for prior graph
     pl.yticks(np.linspace(0.1,0.7,13)) # 0.1,0.6,11 for no incrementing epochs.
 
     pl.xticks(np.linspace(0,2200,12))
     pl.legend(bbox_to_anchor=(1,0.3))
-    # pl.xlabel('Number of features after PCA')
-    # pl.ylabel('Test/train accuracy')
-    # pl.title('Feature choice accuracies resulting from 5-fold cross validation')
-    pl.show()
+    pl.savefig('features.png', bbox_inches='tight')    
 
-    # test = get_best_k(x,test_acc, k=10)
-    # trains = get_best_k(x,train_acc)
-    # for t in test:
-    #     print t
-    # for t in trains:
-    #     print t
+if __name__ == '__main__':
+    # hidden_or_dropout_analysis(hidden_nodes=False)
+    # learning_rate_analysis(log=False)
+    # hidden_or_dropout_analysis(hidden_nodes=True)
+    learning_rate_analysis(log=True)
 
-    pass
-
-
-
-
-
-
-
-
-
-
-
+    exit(0)

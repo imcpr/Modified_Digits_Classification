@@ -7,9 +7,10 @@
 from import_data import import_csv
 from neural_net_efficient import NeuralNetwork
 from sklearn.decomposition import PCA
-# from features import transform_features
+from features import transform_features
 from sklearn.svm import SVC,LinearSVC
 from sklearn.cross_validation import KFold
+from graphic import heatmap
 import numpy as np
 import time
 import random
@@ -53,58 +54,60 @@ def cross_validate(X, Y, n, k=5, epochs=50, lr=1.0, lam=1.0, nhn=50, dropout=Non
 
     return np.mean(avgs_test), np.mean(avgs_train)
 
-def optimize_hyper_params(X, Y):
-    f_name = 'number_of_features_optimization_incrementing_epochs.csv'
-    # with open(f_name,'w') as f:
-
-        #First we find optimal number of features.
-        # my_features = np.linspace(100,2300, num=45).astype(int)
-        # accs = {num : (0.0,0.0) for num in my_features}
-        # f.write("Results from cross validating for finding the optimal number of features:\n")
-        # f.write("features,epochs,test_accuracy,train_accuracy\n")
+def optimize_hyper_params(X, Y, features=0, hidden_nodes=0, dropout=0.0):
+    if not features:
+        with open('number_of_features_optimization_incrementing_epochs.csv','w') as f:
+            my_features = np.linspace(100,2300, num=45).astype(int)
+            accs = {num : (0.0,0.0) for num in my_features}
+            f.write("Results from cross validating for finding the optimal number of features:\n")
+            f.write("features,epochs,test_accuracy,train_accuracy\n")
+            
+            for key in my_features:
+                epochs = 10 + (key/50 - 1)
+                print "Testing %d features, %d epochs..."%(key,epochs),
+                new_x = feature_reduce(X, key)
+                accs[key] = cross_validate(new_x, Y, 5000, epochs=epochs, nhn=50)
+                f.write('%d,%d,%s,%s\n'%(key,epochs,accs[key][0],accs[key][1]))
         
-        # for key in my_features:
-        #     epochs = 10 + (key/50 - 1)
+            features = max(accs, key=accs.get)
 
-        #     print "Testing %d features, %d epochs..."%(key,epochs),
-        #     new_x = feature_reduce(X, key)
-        #     accs[key] = cross_validate(new_x, Y, 5000, epochs=epochs, nhn=50)
-        #     f.write('%d,%d,%s,%s\n'%(key,epochs,accs[key][0],accs[key][1]))
-        
     #Next we will optimize the number of hidden nodes.    
-    # with open('number_of_hidden_nodes_optimization_incrementing_epochs.csv','w') as f:
-        
-    #     reduced_x = feature_reduce(X, 300)
-    #     num_nodes = [1] + [i*10 for i in range(1,101)]
-    #     num_nodes.remove(300)
-    #     num_nodes.append(299)
-    #     num_nodes.sort()
-    #     accs = {num_nodes[i] : (0.0,0.0) for i in range(len(num_nodes))}
-    #     f.write("Results from cross validating for finding the optimal number of hidden nodes:\n")
-    #     f.write("num_nodes,test_accuracy,train_accuracy\n")
-    #     for key in num_nodes:
-    #         accs[key] = cross_validate(reduced_x, Y, 5000, nhn=key, epochs=10 + (key/10), lr=1.0, dropout=None)
-    #         f.write('%d,%s,%s\n'%(key,accs[key][0],accs[key][1]))
+    if not hidden_nodes:
+        with open('number_of_hidden_nodes_optimization_incrementing_epochs.csv','w') as f:
+            reduced_x = feature_reduce(X, features)
 
-    # exit(0)
+            num_nodes = [1] + [i*10 for i in range(1,101)]
+            num_nodes.remove(300)
+            num_nodes.append(299) 
+            num_nodes.sort()
+
+            accs = {num_nodes[i] : (0.0,0.0) for i in range(len(num_nodes))}
+            f.write("Results from cross validating for finding the optimal number of hidden nodes:\n")
+            f.write("num_nodes,test_accuracy,train_accuracy\n")
+            for key in num_nodes:
+                accs[key] = cross_validate(reduced_x, Y, 5000, nhn=key, epochs=10 + (key/10), lr=1.0, dropout=None)
+                f.write('%d,%s,%s\n'%(key,accs[key][0],accs[key][1]))
+
+            hidden_nodes = max(accs, key=accs.get)
 
     #Next we optimize the dropout value.
-    with open('dropout_optimization_100epochs.csv','w') as f:
-        reduced_x = feature_reduce(X, 300)
-        dropouts = np.linspace(0.05, 0.95, 19)
-        accs = {val : 0.0 for val in dropouts}
-        f.write("Results from cross validating for finding the optimal value of the dropout constant:\n")
-        f.write("dropout_value,test_accuracy,train_accuracy\n")
-        for key in dropouts:
-            print 'Testing dropout = %s...'%key
-            accs[key] = cross_validate(reduced_x, Y, 5000, nhn=50, epochs=100, lr=1.0, dropout=key)
-            f.write('%s,%s,%s\n'%(key,accs[key][0],accs[key][1]))
+    if not dropout:
+        with open('dropout_optimization_100epochs.csv','w') as f:
+            reduced_x = feature_reduce(X, features)
+            dropouts = np.linspace(0.05, 0.95, 19)
+            accs = {val : 0.0 for val in dropouts}
+            
+            f.write("Results from cross validating for finding the optimal value of the dropout constant:\n")
+            f.write("dropout_value,test_accuracy,train_accuracy\n")
+            for key in dropouts:
+                print 'Testing dropout = %s...'%key
+                accs[key] = cross_validate(reduced_x, Y, 5000, nhn=hidden_nodes, epochs=100, lr=1.0, dropout=key)
+                f.write('%s,%s,%s\n'%(key,accs[key][0],accs[key][1]))
 
-    exit(0)
+            dropout = max(accs, key=accs.get)
 
-    with open('learning_rate_optimization.csv','w') as f:
-        reduced_x = feature_reduce(X, 300)
-        # dropouts = np.linspace(0.05, 0.95, 19)
+    with open('learning_rate_validation_results.csv','w') as f:
+        reduced_x = feature_reduce(X, features)
         # learning_rates = [10**i for i in range(-3,4)]
         learning_rates = np.linspace(0.1, 2.0, 39)
 
@@ -113,12 +116,10 @@ def optimize_hyper_params(X, Y):
         f.write("learning_rate,test_accuracy,train_accuracy\n")
         for key in learning_rates:
             print '\nTesting learning_rate = %s...'%key
-            accs_log[key] = cross_validate(reduced_x, Y, 5000, nhn=50, epochs=50, lr=key, dropout=0.1)
+            accs_log[key] = cross_validate(reduced_x, Y, 5000, nhn=hidden_nodes, epochs=50, lr=key, dropout=dropout)
             f.write('%s,%s,%s\n'%(key,accs_log[key][0],accs_log[key][1]))
 
-    exit(0)
-
-        #The code below was for selecting the best weight initialization but it is unnecessary..
+    #The code below was for selecting the best weight initialization but it is unnecessary..
         # logs = [i for i in range(-3,4)]
         # accuracies_logistic = {logs[v]: 0.0 for v in logs}
         # f.write('Results from logistic weight range cross validation:\n')
@@ -135,38 +136,7 @@ def optimize_hyper_params(X, Y):
         # best_weights = max(accuracies_iterative, accuracies_iterative.get)
 
 if __name__ == '__main__':
-    # Below provides a good test to show that it works succesfully based on the example given
-    # on this paper (pg. 20): https://www4.rgu.ac.uk/files/chapter3%20-%20bp.pdf
-    #
-    """
-    nn = NeuralNetwork(2, [3], 2, dummy=False, weight_range=(-3,3))
-    nn.fit(np.array([[0.35, 0.9]]), np.array([1]), training_horizon=1)
-
-    x = []
-    b = [1.0,0.0]
-    for ii in b:
-        for jj in b:
-            for kk in b:
-                x.append([ii,jj,kk])
-    y = []
-    for l in x:
-        y.append(1.0 if (l[0] or l[1]) and l[2] else 0.0)
-    # for i in x: print i
-    # print y
-
-    nn = NeuralNetwork(3,[5],2,weight_range=(0,1),learning_rate=1.0,dummy=True)
-    # print nn.weights
-    # # nn.feedforward(x[0])
-    # # nn.backpropagate(target_value=1.0)
-    # print nn.weights
-    nn.fit(x,y, training_horizon=1000, verbose=True)
-    p = nn.predict(x)
-    print '-------------------------------'
-    print p,y
-    accuracy(p,y)
-
-    exit(0)
-    """
+    num_classes = 10
 
     starttime = time.clock()
     train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
@@ -176,49 +146,37 @@ if __name__ == '__main__':
     print 'Time to import: %0.1f'%(time.clock() - starttime)
 
     random.seed(1917)
-    rand_idxs = random.sample(range(len(train_inputs)), 5000)
-    train_inputs = train_inputs[rand_idxs]
-    train_outputs = train_outputs[rand_idxs]
+    t_size = 40000
 
-    reduced_x = feature_reduce(train_inputs, 300)
-    cross_validate(reduced_x, train_outputs, 5000, nhn=50, epochs=1000, lr=0.5, dropout=0.1, v=True)
-    exit(0)
-    # optimize_hyper_params(train_inputs, train_outputs)
+    train_inputs = feature_reduce(train_inputs, 300)
+
+    rand_idxs = random.sample(range(len(train_inputs)), 50000)
+    train_x = train_inputs[rand_idxs[0:t_size]]
+    train_y = train_outputs[rand_idxs[0:t_size]]
+    test_x = train_inputs[rand_idxs[t_size:]]
+    test_y = train_outputs[rand_idxs[t_size:]]
 
 
-    # alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), 500)
-    # train = alll[:len(train_inputs)]
-    # test = alll[len(train_inputs):]
-    # train_x = train_inputs[0:4500]
-    # train_y = train_outputs[0:4500]
-    # test_x = train_inputs[4501:]
-    # test_y = train_outputs[4501:]
+    #Validation set results
+    nn = NeuralNetwork(len(train_x[0]), [50], num_classes, dummy=True, learning_rate=1.0, dropout=0.1)
+    nn.fit(train_x, train_y, training_horizon=100, verbose=True)
+    p = nn.predict(test_x)
+    print accuracy(p, test_y)
+    # heatmap(p, test_y, 'ff_nn_results_50hiddennodes_lr1_dropout1')
 
-    starttime = time.clock()
-    print 'Building network...'
-    num_classes = 10
-    nn = NeuralNetwork(len(train[0]), [25], num_classes, dummy=True, learning_rate=1.0)
+    nn = NeuralNetwork(len(train_x[0]), [50, 15], num_classes, dummy=True, learning_rate=1.0, dropout=0.1)
+    nn.fit(train_x, train_y, training_horizon=100, verbose=True)
+    p = nn.predict(test_x)
+    print accuracy(p, test_y)
+    # heatmap(p, test_y, 'ff_nn_results_50hiddennodes_15hiddennodes2_lr1_dropout01')
 
-    print 'Training network...'
-    nn.fit(train, train_outputs, training_horizon=100, verbose=True)
-    print 'Time to train: %0.1f'%(time.clock() - starttime)
 
+    #For testing on the main kaggle test file.
     p = nn.predict(test)
     with open(data_files_path+'predictions_500f_umodified_1layer_25nodes_th100.csv','w') as f:
         f.write('Id,Prediction\n')
         for i in range(len(p)):
             f.write('%d,%d\n'%(i+1,p[i]))
-
-    # print '\nTest set results:'
-    # p_test = nn.predict(test_x, verbose=True)
-    # print p_test
-    # accuracy(p_test, test_y)
-    #
-    # print '\nTrain set results:'
-    # p_train = nn.predict(train_x, verbose=True)
-    # print p_train
-    # accuracy(p_train, train_y)
-    # nn.log()
 
     """
     print '------------'
