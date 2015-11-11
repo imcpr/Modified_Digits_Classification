@@ -1,9 +1,11 @@
 # coding=utf-8
 # Authors:
 #   Kian Kenyon-Dean.
+#   Yann Long
 #
 # Coding began October 31st, 2015
 
+import numpy as np
 from import_data import import_csv
 from neural_net_efficient import NeuralNetwork
 from sklearn.decomposition import PCA
@@ -11,19 +13,21 @@ from features import transform_features
 from sklearn.svm import SVC,LinearSVC
 from sklearn.cross_validation import KFold
 from graphic import heatmap
+from sys import argv
 import numpy as np
 import time
 import random
 import pyprind
+import os
 
 data_files_path = 'data_and_scripts/'
 
-TRAIN_INPUTS_PATH = data_files_path+'train_inputs.csv'
+TRAIN_INPUTS_PATH = data_files_path+'transformed_train_inputs.csv'
 TRAIN_OUTPUTS_PATH = data_files_path+'train_outputs.csv'
-TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
+TEST_INPUTS_PATH = data_files_path+'transformed_test_inputs.csv'
 
-TRAIN_INPUT_SUBSET_PATH = data_files_path+'train_inputs_subset.csv'
-TRAIN_OUTPUT_SUBSET_PATH = data_files_path+'train_outputs_subset.csv'
+TRAIN_INPUTS_SUBSET_PATH = data_files_path+'train_inputs_subset.csv'
+TRAIN_OUTPUTS_SUBSET_PATH = data_files_path+'train_outputs_subset.csv'
 
 def feature_reduce(dataset, desired):
     print 'Reducing feature set size from %d to %d...'%(len(dataset[0]),desired)
@@ -54,7 +58,7 @@ def cross_validate(X, Y, n, k=5, epochs=50, lr=1.0, lam=1.0, nhn=50, dropout=Non
 
     return np.mean(avgs_test), np.mean(avgs_train)
 
-def optimize_hyper_params(X, Y, features=0, hidden_nodes=0, dropout=0.0):
+def optimize_hyper_params(X, Y, features=0, hidden_nodes=0, dropout=0.0, lr=0.0):
     if not features:
         with open('number_of_features_optimization_incrementing_epochs.csv','w') as f:
             my_features = np.linspace(100,2300, num=45).astype(int)
@@ -106,56 +110,68 @@ def optimize_hyper_params(X, Y, features=0, hidden_nodes=0, dropout=0.0):
 
             dropout = max(accs, key=accs.get)
 
-    with open('learning_rate_validation_results.csv','w') as f:
-        reduced_x = feature_reduce(X, features)
-        # learning_rates = [10**i for i in range(-3,4)]
-        learning_rates = np.linspace(0.1, 2.0, 39)
+    if not lr:
+        with open('learning_rate_validation_results.csv','w') as f:
+            reduced_x = feature_reduce(X, features)
+            # learning_rates = [10**i for i in range(-3,4)]
+            learning_rates = np.linspace(0.1, 2.0, 39)
 
-        accs_log = {val : 0.0 for val in learning_rates}
-        f.write("Results from cross validating for finding the optimal value of the learning rate:\n")
-        f.write("learning_rate,test_accuracy,train_accuracy\n")
-        for key in learning_rates:
-            print '\nTesting learning_rate = %s...'%key
-            accs_log[key] = cross_validate(reduced_x, Y, 5000, nhn=hidden_nodes, epochs=50, lr=key, dropout=dropout)
-            f.write('%s,%s,%s\n'%(key,accs_log[key][0],accs_log[key][1]))
+            accs_log = {val : 0.0 for val in learning_rates}
+            f.write("Results from cross validating for finding the optimal value of the learning rate:\n")
+            f.write("learning_rate,test_accuracy,train_accuracy\n")
+            for key in learning_rates:
+                print '\nTesting learning_rate = %s...'%key
+                accs_log[key] = cross_validate(reduced_x, Y, 5000, nhn=hidden_nodes, epochs=50, lr=key, dropout=dropout)
+                f.write('%s,%s,%s\n'%(key,accs_log[key][0],accs_log[key][1]))
 
-    #The code below was for selecting the best weight initialization but it is unnecessary..
-        # logs = [i for i in range(-3,4)]
-        # accuracies_logistic = {logs[v]: 0.0 for v in logs}
-        # f.write('Results from logistic weight range cross validation:\n')
-        # for key in accuracies_logistic:
-        #     accuracies_logistic[key] = cross_validate(X, Y, 5000, weights=(-1.0*(10.0**key),10.0**key))
-        #     f.write('\tweights range = (%s,%s): %s\n'%((10.0**key)*-1.0,10.0**key,accuracies_logistic[key]))
-        #
-        # best = max(accuracies_logistic, accuracies_logistic.get)
-        # iterative_test = np.linspace(10.0**(best-0.5), 10.0**(best+0.5), num=20)
-        # accuracies_iterative = {iterative_test[i] : 0.0 for i in range(len(iterative_test))}
-        # for key in accuracies_iterative:
-        #     accuracies_iterative[key] = cross_validate(X, Y, 5000, weights=(-1.0*key, key))
-        #     f.write('\tweights range = (%s,%s): %s\n'%((-1.0*key), key, accuracies_iterative[key]))
-        # best_weights = max(accuracies_iterative, accuracies_iterative.get)
+    return np.mean(avgs_test)#, np.mean(avgs_train)
 
 if __name__ == '__main__':
     num_classes = 10
 
+    if len(argv) == 1:
+        print 'Please call this program as follows:\n$ python classification.py options'
+        print 'Where the following options are available:'
+        print '\t-validate: runs the default neural network over the validation set and prints the results'
+        print '\t-test: runs the default neural network over the kaggle test set and writes the results file'
+        print '\t-hn X1 X2 X3 Xk: sets the number of hidden nodes for each hidden layer, i.e. two values after -hn \
+                    means two hidden layers. Default is empty'
+        print '\t-d X: sets the dropout value, must be between 0 and 1'
+        print '\t-f X: sets number of features to reduce to, default is 300'
+        print '\t-lr X: sets the learning rate, default is 1.0'
+        print '\t-t: transform features using Caspers feature transformation.'
+
     starttime = time.clock()
     train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
-    train_inputs = (import_csv(TRAIN_INPUTS_PATH))
-    # test_inputs = (import_csv(TEST_INPUTS_PATH))
-    # train_inputs = import_csv(TRAIN_INPUT_SUBSET_PATH)
-    print 'Time to import: %0.1f'%(time.clock() - starttime)
+    train_inputs = import_csv(TRAIN_INPUTS_PATH)
+    # kaggle_test_inputs = import_csv(TEST_INPUTS_PATH)
 
     random.seed(1917)
-    t_size = 40000
+    validation_size = 40000
 
     train_inputs = feature_reduce(train_inputs, 300)
 
     rand_idxs = random.sample(range(len(train_inputs)), 50000)
-    train_x = train_inputs[rand_idxs[0:t_size]]
-    train_y = train_outputs[rand_idxs[0:t_size]]
-    test_x = train_inputs[rand_idxs[t_size:]]
-    test_y = train_outputs[rand_idxs[t_size:]]
 
+    train_inputs = train_inputs[rand_idxs[0 : validation_size]]
+    train_y = train_outputs[rand_idxs[0 : validation_size]]
+    test_inputs = train_inputs[rand_idxs[validation_size :]]
+    test_y = train_outputs[rand_idxs[validation_size :]]
+
+    # We have to reduce the features all at the same time because it is unsupervised learning and
+    # we want the same features to be picked by PCA for both of the train and test sets.
+    alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), 500)
+    train = alll[: len(train_inputs)]
+    test = alll[len(train_inputs) :]
+
+    starttime = time.clock()
+    print 'Building network...'
+    num_classes = 10
+    nn = NeuralNetwork(len(train_inputs[0]), [50], num_classes, dummy=True, learning_rate=0.05, dropout=0.5)
+
+    print 'Training network...'
+    nn.fit(train_x, train_y, training_horizon=200, verbose=True)
+    print 'Time to train: %0.1f'%(time.clock() - starttime)
 
     #Validation set results
     nn = NeuralNetwork(len(train_x[0]), [50], num_classes, dummy=True, learning_rate=1.0, dropout=0.1)

@@ -62,6 +62,9 @@ def a2m(arr):
 def show_image(image):
     plt.imshow(image, cmap="Greys_r")
     plt.show()
+    
+# def save_image(image):
+    
 
 # helper to load training set
 def get_train(index=50000):
