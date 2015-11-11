@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 from matplotlib.image import imsave
 from sklearn import svm, metrics
 from skimage.morphology import reconstruction
+from skimage.transform import resize
 
 # calculates the moment of the image
 def M(image, p, q):
@@ -28,7 +29,7 @@ def M(image, p, q):
     for x in range(0, w):
         for y in range(0, h):
             acc += (x**p)*(y**q)*image[x,y]
-    acc
+    return acc
 
 # using image moments, tries to align the image by its principal axis
 def deskew(image):
@@ -67,10 +68,48 @@ def show_image(image):
     
 
 # helper to load training set
-def get_train(index=50000):
+def get_train(index=50000, start=0, transform=True):
     train_inputs = []
     train_outputs = []
-    with open('data_and_scripts/train_inputs.csv', 'rb') as csvfile:
+    if transform:
+        filename = 'data_and_scripts/transformed_train_inputs.csv'
+    else:
+        filename = 'data_and_scripts/train_inputs.csv'
+    with open(filename, 'rb') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        if not transform:
+            next(reader, None)  # skip the header
+        i = 0
+        bar = pyprind.ProgBar(index, title="Loading training data from csv")
+        for train_input in reader: 
+            if i >= index:
+                break
+            i += 1
+            train_input_no_id = []
+            # print len(train_input)
+            if i >= start:
+                for pixel in train_input[1:2305]: # Start at index 1 to skip the Id
+                    train_input_no_id.append(float(pixel))
+                train_inputs.append(train_input_no_id) 
+            bar.update()
+    with open('data_and_scripts/train_outputs.csv', 'rb') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        next(reader, None)  # skip the header
+        i = 0
+        for train_output in reader:  
+            if i >= index:
+                break
+            i += 1
+            if i >= start:
+                train_output_no_id =  int(train_output[1])
+                train_outputs.append(train_output_no_id)
+    return train_inputs, train_outputs
+
+
+def get_test(index=20000):
+    train_inputs = []
+    train_outputs = []
+    with open('data_and_scripts/test_inputs.csv', 'rb') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         next(reader, None)  # skip the header
         i = 0
@@ -84,17 +123,8 @@ def get_train(index=50000):
                 train_input_no_id.append(float(pixel))
             train_inputs.append(train_input_no_id) 
             bar.update()
-    with open('data_and_scripts/train_outputs.csv', 'rb') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        next(reader, None)  # skip the header
-        i = 0
-        for train_output in reader:  
-            if i >= index:
-                break
-            i += 1
-            train_output_no_id =  int(train_output[1])
-            train_outputs.append(train_output_no_id)
-    return train_inputs, train_outputs
+    print i
+    return train_inputs
 
 # use dilations
 def get_dilated(image):
@@ -115,6 +145,13 @@ def get_circle_filter(cols, rows):
             d = 1-math.sqrt(abs(x-cx)**2+abs(y-cy)**2)/max_d
             f[x,y] = d*d
     return f
+
+def apply_linear_filter(image, f):
+    f = f.flatten()
+    new = []
+    for i in range(len(image)):
+        new.append(min(1,image[i]*f[i]))
+    return new
 # apply a filter matrix to image
 def apply_filter(image, f):
     rows, cols = image.shape
@@ -127,41 +164,50 @@ def apply_filter(image, f):
 # takes in a dataset X, and transforms each row, outputs a new dataset
 # might wanna make it in place if dealing with large dataset to save memory
 def transform_features(data):
-    d = get_circle_filter(48,48)
-    out_data = []
-    bar = pyprind.ProgBar(len(data), title="Transforming raw features")
-    for row in data:
-        # from (2304,) to (48,48) because i wrote the functions for 2d , can optimize later
-        m = a2m(row)
-        dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
-        dm = dm-get_dilated(dm)*0.5
-        out_data.append(dm.flatten())
-        bar.update()
-    return out_data
+    with open('transformed_test_inputs.csv', 'wb') as csvfile:
+        d = get_circle_filter(48,48)
+        # writer = csv.writer(csvfile)
+        # writer.writerow(["Id", "Prediction"])
+        out_data = []
+        i = 1
+        bar = pyprind.ProgBar(len(data), title="Transforming raw features")
+        for row in data:
+            # from (2304,) to (48,48) because i wrote the functions for 2d , can optimize later
+            m = a2m(row)
+            dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
+            dm = dm-get_dilated(dm)*0.5
+            # out_data.append(dm.flatten())
+            # print len(dm.flattenedten())
+            r = "%s," % str(i)
+            for j in dm.flatten():
+                r += "%s," % str(j)
+            csvfile.write(r[:-1] + "\n")
+            i += 1
+            bar.update()
+        return out_data
 
-# # d = get_circle_filter(48,48)
-# X, Y = get_train(10000)
-# # dX = []
-# # for i in range(0, len(X)):
-# #     m = a2m(X[i])
-# #     dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
-# #     dm = dm-get_dilated(dm)*0.5
-# #     # imsave("data_and_scripts/original/%d.png" % (i+1), m, cmap="Greys_r")
-# #     imsave("data_and_scripts/deskew/%d.png" % (i+1), dm, cmap="Greys_r")
+def read_preds(filename):
+    pred = []
+    with open(filename, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader: 
+            if row[1] != "Prediction":
+                pred.append(int(row[1]))
+    return pred
 
-# dX = transform_features(X)
-# cl = svm.SVC(gamma=0.001)
-# cl = cl.fit(dX[:8000], Y[:8000])
-# pred = cl.predict(dX[8000:])
-# print metrics.zero_one_loss(Y[8000:], pred, normalize=False)
+def get_ensemble(preds):
+    best = []
+    for i in range(len(preds[0])):
+        tmp = []
+        for p in preds:
+            tmp.append(p[i])
+        bin = np.bincount(tmp)
+        idx = np.argmax(bin)
+        if bin[idx] != 3:
+            print "Disagree at index %d" % i
+        best.append(np.argmax(np.bincount(tmp)))
+    return best
 
-# MNIST test
-# for i in range(0, 70000):
-#     if (i %700 == 0):
-#         m = a2m(mnist.data[i])
-#         dm = deskew(m)
-#         imsave("original/%d.png" % (i+1), m)
-#         imsave("deskew/%d.png" % (i+1), dm)
 
 def makeHeader(i):
     header = 'Id'
@@ -202,11 +248,12 @@ def main():
     print 'Time to transform: %0.1f'%(time.clock() - starttime)
     
     #apply PCA
-    starttime = time.clock()
-    desired=500
-    print 'Reducing feature set size from %d to %d...'%(K,desired)
-    features = PCA(n_components=desired).fit_transform(transformed_concat)
-    print 'Time to transform: %0.1f'%(time.clock() - starttime)
+    # starttime = time.clock()
+    # desired=500
+    # print 'Reducing feature set size from %d to %d...'%(K,desired)
+    # features = PCA(n_components=desired).fit_transform(transformed_concat)
+    # print 'Time to transform: %0.1f'%(time.clock() - starttime)
+    features = transformed_concat
     
     #split
     transform_train_inputs, transform_test_inputs = features[:N,], features[N:,]
@@ -224,4 +271,4 @@ def main():
     
 
    
-if __name__ == '__main__': main()
+# if __name__ == '__main__': main()
