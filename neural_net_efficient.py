@@ -20,7 +20,7 @@ class NeuralNetwork(object):
         """ hidden_layers_nodes: a python list whose length is the number of hidden layers and values are number of nodes per layer. """
         np.random.seed(seed)
 
-        self.dummy = 1 if dummy else 0
+        self.dummy = num_outputs if dummy else 0
         self.lr = learning_rate
         self.p = dropout
         self.c = maxnorm
@@ -28,9 +28,9 @@ class NeuralNetwork(object):
         self.up = update
 
         # quantities of nodes
-        self.ni = num_inputs + dummy
+        self.ni = num_inputs + self.dummy
         self.nhl = len(hidden_layers_nodes) # num hidden layers
-        self.nhn = list(np.array(hidden_layers_nodes) + dummy) # num hidden nodes per layer
+        self.nhn = list(np.array(hidden_layers_nodes) + self.dummy) # num hidden nodes per layer
         self.no = num_outputs
         
         # initialize node matrix
@@ -73,7 +73,9 @@ class NeuralNetwork(object):
         """ training_horizon designates how many times we iterate through the training set. """
         assert len(X) == len(y)
         assert len(X[0])+self.dummy == len(self.nodes[0])
+
         if verbose:
+            print 'Fitting the Neural Network...'
             bar = pyprind.ProgBar(training_horizon*len(X))
         if grad_descent == 'stochastic':
             for j in range(training_horizon):

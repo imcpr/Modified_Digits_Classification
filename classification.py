@@ -19,12 +19,13 @@ import time
 import random
 import pyprind
 import os
+import subprocess
 
 data_files_path = 'data_and_scripts/'
 
-TRAIN_INPUTS_PATH = data_files_path+'transformed_train_inputs.csv'
+TRAIN_INPUTS_PATH = data_files_path+'train_inputs.csv'
 TRAIN_OUTPUTS_PATH = data_files_path+'train_outputs.csv'
-TEST_INPUTS_PATH = data_files_path+'transformed_test_inputs.csv'
+TEST_INPUTS_PATH = data_files_path+'test_inputs.csv'
 
 TRAIN_INPUTS_SUBSET_PATH = data_files_path+'train_inputs_subset.csv'
 TRAIN_OUTPUTS_SUBSET_PATH = data_files_path+'train_outputs_subset.csv'
@@ -126,73 +127,120 @@ def optimize_hyper_params(X, Y, features=0, hidden_nodes=0, dropout=0.0, lr=0.0)
 
     return np.mean(avgs_test)#, np.mean(avgs_train)
 
-if __name__ == '__main__':
+def command_line_run(args):
+    args_dict = {}
+    for i in range(1,len(args)):
+        if '-' in args[i]:
+            args_dict[args[i]] = []
+            args_dict[-1] = args_dict[args[i]]
+        else:
+            args_dict[-1].append(float(args[i]))
+    del args_dict[-1]
+
     num_classes = 10
+    random.seed(1917)
+
+    if '-debug' in args_dict:
+        train_outputs = import_csv(TRAIN_OUTPUTS_SUBSET_PATH).astype(int)
+        train_inputs = import_csv(TRAIN_INPUTS_SUBSET_PATH)
+    else:
+        train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
+        train_inputs = import_csv(TRAIN_INPUTS_PATH)
+    
+    if '-t' in args_dict:
+        train_inputs = transform_features(train_inputs)
+
+    # Default values.
+    hnh = []
+    num_features = 300
+    dropout = None
+    lr = 1.0
+    epochs = 50
+
+    if '-f' in args_dict:
+        num_features = map(int, args_dict['-f'])[0]
+
+    if '-test' in args_dict:
+        test_inputs = import_csv(TEST_INPUTS_PATH)
+
+        if '-t' in args_dict:
+            test_inputs = transform_features(test_inputs)
+ 
+        if not num_features == len(train_inputs[0]):
+            alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), num_features)
+            train_inputs = alll[: len(train_inputs)]
+            test_inputs = alll[len(train_inputs) :]
+
+    if '-validate' in args_dict:
+        validation_size = (4 * len(train_inputs)) / 5
+
+        # Randomize the train and validation set.
+        rand_idxs = random.sample(range(0, len(train_inputs)), len(train_inputs))
+
+        test_inputs = train_inputs[rand_idxs[validation_size : ]]
+        test_outputs = train_outputs[rand_idxs[validation_size : ]]
+        train_inputs = train_inputs[rand_idxs[0 : validation_size]]
+        train_outputs = train_outputs[rand_idxs[0 : validation_size]]
+
+        # We have to reduce the features all at the same time because it is unsupervised learning and
+        # we want the same features to be picked by PCA for both of the train and test sets.
+        if not num_features == len(train_inputs[0]):
+            alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), num_features)
+            train_inputs = alll[: len(train_inputs)]
+            test_inputs = alll[len(train_inputs) :]
+
+    if '-hn' in args_dict:
+        hnh = map(int, args_dict['-hn'])
+
+    if '-d' in args_dict:
+        if not (0.0 <= args_dict['-d'][0] <= 1.0):
+            print 'Please input a dropout rate between 0 and 1!'
+            exit(0)
+        dropout = args_dict['-d'][0]
+
+    if '-lr' in args_dict:
+        lr = args_dict['-lr'][0]
+
+    if '-e' in args_dict:
+        epochs = int(args_dict['-e'][0])
+
+    nn = NeuralNetwork(len(train_inputs[0]), hnh, num_classes, learning_rate=lr, dropout=dropout)
+    nn.fit(train_inputs, train_outputs, training_horizon=epochs, verbose=True)
+    p = nn.predict(test_inputs)
+
+    fname = data_files_path+'predictions_with_%depochs_%dfeatures_%0.2flf'%(epochs,num_features,lr)
+    if '-test' in args_dict:
+        with open(fname+'.csv','w') as f:
+            f.write('Id,Prediction\n')
+            for i in range(len(p)):
+                f.write('%d,%d\n'%(i+1,p[i]))
+    else:
+        print accuracy(p, test_outputs)
+        if '-record' in args_dict:
+            heatmap(p, test_y, fname)
+
+
+if __name__ == '__main__':
+    subprocess.call('clear')
 
     if len(argv) == 1:
-        print 'Please call this program as follows:\n$ python classification.py options'
-        print 'Where the following options are available:'
-        print '\t-validate: runs the default neural network over the validation set and prints the results'
-        print '\t-test: runs the default neural network over the kaggle test set and writes the results file'
-        print '\t-hn X1 X2 X3 Xk: sets the number of hidden nodes for each hidden layer, i.e. two values after -hn \
-                    means two hidden layers. Default is empty'
-        print '\t-d X: sets the dropout value, must be between 0 and 1'
-        print '\t-f X: sets number of features to reduce to, default is 300'
-        print '\t-lr X: sets the learning rate, default is 1.0'
-        print '\t-t: transform features using Caspers feature transformation.'
+        print '\n\nPlease call this program as follows:\n$ python classification.py options\n'
+        time.sleep(1)
+        print 'Where the following options are available:\n'
+        print '\t-validate: runs the default neural network over the \n\t\tvalidation set and prints the results. \n\t\t40000 trainings samples, 10000 validation\n'
+        print '\t-test: runs the default neural network over the kaggle \n\t\ttest set and writes the results file\n'
+        print '\t-hn X1 X2 X3 Xk: sets the number of hidden nodes for \n\t\teach hidden layer, i.e. two values after -hn means two \n\t\thidden layers. Default is empty\n'
+        print '\t-d X: sets the dropout value, must be between 0 and 1\n'
+        print '\t-f X: sets number of features to reduce to, default is 300\n'
+        print '\t-lr X: sets the learning rate, default is 1.0\n'
+        print '\t-e X: number of epochs. Default is 50\n'
+        print '\t-t: transform features using Caspers feature transformation\n'
+        print '\t-record: record the results in a heatmap (if -validation)\n'
+        exit(0)
 
-    starttime = time.clock()
-    train_outputs = import_csv(TRAIN_OUTPUTS_PATH).astype(int)
-    train_inputs = import_csv(TRAIN_INPUTS_PATH)
-    # kaggle_test_inputs = import_csv(TEST_INPUTS_PATH)
-
-    random.seed(1917)
-    validation_size = 40000
-
-    train_inputs = feature_reduce(train_inputs, 300)
-
-    rand_idxs = random.sample(range(len(train_inputs)), 50000)
-
-    train_inputs = train_inputs[rand_idxs[0 : validation_size]]
-    train_y = train_outputs[rand_idxs[0 : validation_size]]
-    test_inputs = train_inputs[rand_idxs[validation_size :]]
-    test_y = train_outputs[rand_idxs[validation_size :]]
-
-    # We have to reduce the features all at the same time because it is unsupervised learning and
-    # we want the same features to be picked by PCA for both of the train and test sets.
-    alll = feature_reduce(np.array(list(train_inputs)+list(test_inputs)), 500)
-    train = alll[: len(train_inputs)]
-    test = alll[len(train_inputs) :]
-
-    starttime = time.clock()
-    print 'Building network...'
-    num_classes = 10
-    nn = NeuralNetwork(len(train_inputs[0]), [50], num_classes, dummy=True, learning_rate=0.05, dropout=0.5)
-
-    print 'Training network...'
-    nn.fit(train_x, train_y, training_horizon=200, verbose=True)
-    print 'Time to train: %0.1f'%(time.clock() - starttime)
-
-    #Validation set results
-    nn = NeuralNetwork(len(train_x[0]), [50], num_classes, dummy=True, learning_rate=1.0, dropout=0.1)
-    nn.fit(train_x, train_y, training_horizon=100, verbose=True)
-    p = nn.predict(test_x)
-    print accuracy(p, test_y)
-    # heatmap(p, test_y, 'ff_nn_results_50hiddennodes_lr1_dropout1')
-
-    nn = NeuralNetwork(len(train_x[0]), [50, 15], num_classes, dummy=True, learning_rate=1.0, dropout=0.1)
-    nn.fit(train_x, train_y, training_horizon=100, verbose=True)
-    p = nn.predict(test_x)
-    print accuracy(p, test_y)
-    # heatmap(p, test_y, 'ff_nn_results_50hiddennodes_15hiddennodes2_lr1_dropout01')
-
-
-    #For testing on the main kaggle test file.
-    p = nn.predict(test)
-    with open(data_files_path+'predictions_500f_umodified_1layer_25nodes_th100.csv','w') as f:
-        f.write('Id,Prediction\n')
-        for i in range(len(p)):
-            f.write('%d,%d\n'%(i+1,p[i]))
+    else:
+        command_line_run(argv)
+        exit(0)
 
     """
     print '------------'
