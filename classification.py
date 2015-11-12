@@ -148,7 +148,9 @@ def command_line_run(args):
         train_inputs = import_csv(TRAIN_INPUTS_PATH)
     
     if '-t' in args_dict:
-        train_inputs = transform_features(train_inputs)
+        print len(train_inputs)
+        train_inputs = np.array(transform_features(train_inputs))
+        print len(train_inputs)
 
     # Default values.
     hnh = []

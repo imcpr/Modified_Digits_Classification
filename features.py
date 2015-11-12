@@ -176,7 +176,7 @@ def transform_features(data):
             m = a2m(row)
             dm = deskew(apply_filter(exposure.adjust_gamma(m,0.4), d))
             dm = dm-get_dilated(dm)*0.5
-            # out_data.append(dm.flatten())
+            out_data.append(dm.flatten())
             # print len(dm.flattenedten())
             r = "%s," % str(i)
             for j in dm.flatten():
