@@ -223,7 +223,7 @@ def command_line_run(args):
 
 
 if __name__ == '__main__':
-    subprocess.call('clear')
+    # subprocess.call('clear')
 
     if len(argv) == 1:
         print '\n\nPlease call this program as follows:\n$ python classification.py options\n'
